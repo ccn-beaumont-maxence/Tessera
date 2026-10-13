@@ -1,14 +1,11 @@
-import { loadGame } from '@tessera/cli';
-import { World } from '@tessera/core';
 import { dump, find, findAll, runFrames } from '@tessera/headless';
 import { press } from '@tessera/input';
 import { describe, expect, it } from 'vitest';
+import { loadExample } from '../load';
 import { Bullet, Game, Player } from './game';
 
 async function arena(seed = 1) {
-  const w = new World({ seed });
-  await (await loadGame(`${import.meta.dirname}/scene.yaml`)).setup(w);
-  return w;
+  return loadExample(import.meta.dirname, 'game.ts', seed);
 }
 
 describe('arena', () => {

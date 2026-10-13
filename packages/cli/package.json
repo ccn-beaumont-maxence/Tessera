@@ -11,6 +11,7 @@
     "test": "vitest run --root ../.. packages/cli/"
   },
   "dependencies": {
+    "@tessera/compiler": "workspace:*",
     "@tessera/core": "workspace:*",
     "@tessera/headless": "workspace:*",
     "@tessera/render": "workspace:*",

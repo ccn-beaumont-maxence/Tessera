@@ -82,17 +82,17 @@ Acceptation : les deux jeux sont jouables et testés en headless.
 Ils serviront de référence pour le benchmark de la phase 9.
 
 ## Phase 7 : Le langage Tess
-- [ ] Rédiger `docs/tess-spec.md` (moins de ~2000 tokens), à faire valider
+- [x] Rédiger `docs/tess-spec.md` (moins de ~2000 tokens), à faire valider
       avant d'écrire le compilateur
-- [ ] Lexer et parser écrits à la main (descente récursive) pour avoir
+- [x] Lexer et parser écrits à la main (descente récursive) pour avoir
       des messages d'erreur précis
-- [ ] Vérification de types
-- [ ] Génération de TypeScript avec source maps
-- [ ] Types valeur (vec2, vec3, quat, color) et opérateurs surchargés,
+- [x] Vérification de types
+- [x] Génération de TypeScript avec source maps
+- [x] Types valeur (vec2, vec3, quat, color) et opérateurs surchargés,
       compilés sans allocation
-- [ ] Mots-clés `component`, `system`, `resource`, `event`.
+- [x] Mots-clés `component`, `system`, `resource`, `event`.
       Dans un système, `&` signifie accès en écriture
-- [ ] Diagnostics pour les réflexes C++ : `->`, `#include`, `std::`,
+- [x] Diagnostics pour les réflexes C++ : `->`, `#include`, `std::`,
       pointeurs, headers, avec un message court indiquant l'équivalent Tess
 
 Syntaxe cible :

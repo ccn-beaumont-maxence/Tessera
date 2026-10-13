@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { tess } from '@tessera/compiler/vite';
 import { type Game, World } from '@tessera/core';
 import { dump, runFrames } from '@tessera/headless';
 import { sceneGame } from '@tessera/scene';
@@ -123,6 +124,7 @@ export async function serve(root: string, port = 0, index?: string): Promise<Vit
     root,
     server: { port, fs: { strict: false } },
     plugins: [
+      tess(),
       {
         name: 'tess-page',
         // YAML is fetched, not imported: tell the page instead of letting Vite reload it.

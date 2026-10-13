@@ -1,5 +1,5 @@
 dimension: 2d
-scripts: [./game.ts]
+scripts: [./game.tess]
 systems: [PlayerMove, EnemyPatrol, Contacts, CameraFollow]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], stick: PadLeft }

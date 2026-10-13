@@ -15,17 +15,21 @@ export interface AxisBinding {
   stick?: 'PadLeft' | 'PadRight';
 }
 
-const InputState = resource('Input', () => ({
-  bindings: {} as Bindings,
-  /** Raw buttons currently held (written by DOM listeners or `press`). */
-  buttons: new Set<string>(),
-  sticks: { PadLeft: vec2(), PadRight: vec2() },
-  /** Pointer in normalized device coordinates: (-1,-1) bottom-left, (1,1) top-right. */
-  pointer: vec2(),
-  down: new Set<string>(),
-  prev: new Set<string>(),
-  axes: new Map<string, Vec2>(),
-}));
+const InputState = resource(
+  'Input',
+  () => ({
+    bindings: {} as Bindings,
+    /** Raw buttons currently held (written by DOM listeners or `press`). */
+    buttons: new Set<string>(),
+    sticks: { PadLeft: vec2(), PadRight: vec2() },
+    /** Pointer in normalized device coordinates: (-1,-1) bottom-left, (1,1) top-right. */
+    pointer: vec2(),
+    down: new Set<string>(),
+    prev: new Set<string>(),
+    axes: new Map<string, Vec2>(),
+  }),
+  { internal: true },
+);
 
 const PAD_BUTTONS = [
   'PadA',

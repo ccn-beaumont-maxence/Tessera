@@ -1,0 +1,24 @@
+{
+  "name": "@tessera/compiler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./runtime": "./src/runtime.ts",
+    "./vite": "./src/vite.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. packages/compiler/"
+  },
+  "dependencies": {
+    "@tessera/audio": "workspace:*",
+    "@tessera/core": "workspace:*",
+    "@tessera/input": "workspace:*",
+    "@tessera/physics": "workspace:*",
+    "@tessera/scene": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

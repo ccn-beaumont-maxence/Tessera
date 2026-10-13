@@ -47,8 +47,10 @@ system Spawn(Spawner& s) { ... }
 
 ```cpp
 float speedOf(Enemy en) { return en.speed * 2; }
-void respawn(Entity e) { get<Transform2D>(e).position = vec2(0, 1); }
+void respawn(Entity e, Score& score) { get<Transform2D>(e).position = vec2(0, 1); score.deaths++; }
 ```
+
+Parameters are read-only; component and resource parameters may be `T&` (passed by reference).
 
 `if/else`, `while`, `for (init; cond; step)`, `break`, `continue`, `return`, `? :`,
 `+ - * / %`, `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
@@ -87,7 +89,7 @@ Conventions: Y up, meters, radians, 3D forward is -Z.
 | Written | Use instead |
 | --- | --- |
 | `#include`, headers | list every `.tess` file in the scene's `scripts:` |
-| `a->b`, `T*`, `&x` | `a.b`; `T&` only on system parameters; `Entity` to refer to entities |
+| `a->b`, `T*`, `&x` | `a.b`; `T&` only on component/resource parameters; `Entity` to refer to entities |
 | `std::` | built-ins (`std::min` → `min`, `std::cout` → `log`) |
 | `new`, `delete`, `nullptr` | `spawn`, `destroy`, `none` |
 | `class`, `struct` | `component`, `resource`, `event` |

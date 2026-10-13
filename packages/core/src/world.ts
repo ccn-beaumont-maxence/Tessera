@@ -11,6 +11,8 @@ export interface ResourceType<T> {
   readonly kind: 'resource';
   readonly name: string;
   readonly create: () => T;
+  /** Engine bookkeeping, left out of state dumps. */
+  readonly internal?: boolean;
 }
 export interface EventType<T> {
   readonly kind: 'event';
@@ -24,11 +26,11 @@ export const component = <T>(name: string, create: () => T): ComponentType<T> =>
   name,
   create,
 });
-export const resource = <T>(name: string, create: () => T): ResourceType<T> => ({
-  kind: 'resource',
-  name,
-  create,
-});
+export const resource = <T>(
+  name: string,
+  create: () => T,
+  options: { internal?: boolean } = {},
+): ResourceType<T> => ({ kind: 'resource', name, create, ...options });
 export const event = <T>(name: string): EventType<T> => ({ kind: 'event', name });
 
 /** Marks a query term as written: `system('Move', [mut(Transform3D), Velocity], ...)`. */
@@ -260,6 +262,11 @@ export class World {
       this.resources.set(type, v);
     }
     return v as T;
+  }
+
+  /** Resources created so far, in creation order. */
+  resourceList(): [ResourceType<unknown>, unknown][] {
+    return [...this.resources];
   }
 
   emit<T>(type: EventType<T>, payload: T): void {

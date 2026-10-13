@@ -14,5 +14,10 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["packages/core/src", "packages/headless/src", "packages/physics/src"]
+  "include": [
+    "packages/core/src",
+    "packages/headless/src",
+    "packages/physics/src",
+    "packages/compiler/src"
+  ]
 }

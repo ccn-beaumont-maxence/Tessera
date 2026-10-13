@@ -3,13 +3,17 @@ import { resource, type World } from '@tessera/core';
 
 const LOG_SIZE = 32;
 
-const AudioState = resource('Audio', () => ({
-  /** Bus volumes in [0,1]; `master` scales every other bus. */
-  volumes: { master: 1, music: 1, sfx: 1 } as Record<string, number>,
-  /** Last sounds requested, newest last (headless assertions). */
-  log: [] as { frame: number; url: string; bus: string }[],
-  music: null as { url: string; stop(): void } | null,
-}));
+const AudioState = resource(
+  'Audio',
+  () => ({
+    /** Bus volumes in [0,1]; `master` scales every other bus. */
+    volumes: { master: 1, music: 1, sfx: 1 } as Record<string, number>,
+    /** Last sounds requested, newest last (headless assertions). */
+    log: [] as { frame: number; url: string; bus: string }[],
+    music: null as { url: string; stop(): void } | null,
+  }),
+  { internal: true },
+);
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;

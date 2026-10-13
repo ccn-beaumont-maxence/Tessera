@@ -1,15 +1,13 @@
-import { loadGame } from '@tessera/cli';
-import { Transform2D, vec2, World } from '@tessera/core';
+import { Transform2D, vec2, type World } from '@tessera/core';
 import { dump, find, runFrames } from '@tessera/headless';
 import { press, release } from '@tessera/input';
 import { RigidBody } from '@tessera/physics';
 import { describe, expect, it } from 'vitest';
+import { loadExample } from '../load';
 import { Score } from './game';
 
 async function level(seed = 1) {
-  const w = new World({ seed });
-  await (await loadGame(`${import.meta.dirname}/scene.yaml`)).setup(w);
-  return w;
+  return loadExample(import.meta.dirname, 'game.ts', seed);
 }
 
 const place = (w: World, name: string, x: number, y: number) => {

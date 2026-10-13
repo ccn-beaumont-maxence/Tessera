@@ -9,7 +9,9 @@ export * from './components';
 
 type AnyBackend = Backend<{ handle: number }, { handle: number }>;
 
-const PhysicsState = resource('Physics', () => ({ backend: null as AnyBackend | null }));
+const PhysicsState = resource('Physics', () => ({ backend: null as AnyBackend | null }), {
+  internal: true,
+});
 
 /**
  * Loads Rapier and schedules the `Physics` system at this point of the system order.

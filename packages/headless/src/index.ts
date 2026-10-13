@@ -52,9 +52,12 @@ export function dumpEntity(world: World, e: Entity): string {
   return parts.join(' ');
 }
 
-/** Whole world, one line per entity in creation order, prefixed by the frame number. */
+/** Whole world: frame number, game resources (`@Score{coins:2}`), then one line per entity. */
 export function dump(world: World): string {
   const lines = [`frame ${world.frame}`];
+  for (const [type, value] of world.resourceList()) {
+    if (!type.internal) lines.push(`@${type.name}${formatComponent(type.create(), value)}`);
+  }
   for (const e of world.entities()) lines.push(dumpEntity(world, e));
   return lines.join('\n');
 }

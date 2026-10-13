@@ -6,7 +6,8 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
-      "suspicious": { "noExplicitAny": "error" }
+      "suspicious": { "noExplicitAny": "error" },
+      "correctness": { "noVoidTypeReturn": "off" }
     }
   },
   "javascript": { "formatter": { "quoteStyle": "single" } },

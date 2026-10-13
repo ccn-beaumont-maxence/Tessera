@@ -15,6 +15,7 @@
     "@tessera/assets": "workspace:*",
     "@tessera/audio": "workspace:*",
     "@tessera/cli": "workspace:*",
+    "@tessera/compiler": "workspace:*",
     "@tessera/core": "workspace:*",
     "@tessera/headless": "workspace:*",
     "@tessera/input": "workspace:*",

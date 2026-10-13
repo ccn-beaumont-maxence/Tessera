@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config';
+// Relative import so the config bundler inlines the TypeScript plugin.
+import { tess } from './packages/compiler/src/vite';
 
 export default defineConfig({
+  plugins: [tess()],
   test: {
     include: ['packages/*/src/**/*.test.ts', 'examples/**/*.test.ts'],
     coverage: {

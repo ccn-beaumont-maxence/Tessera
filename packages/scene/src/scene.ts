@@ -57,12 +57,16 @@ interface Registry {
   systems: Record<string, System>;
 }
 
-const SceneState = resource('Scene', () => ({
-  parsed: null as Parsed | null,
-  registry: null as Registry | null,
-  io: null as SceneIO | null,
-  entities: new Map<string, { entity: Entity; spec: Spec }>(),
-}));
+const SceneState = resource(
+  'Scene',
+  () => ({
+    parsed: null as Parsed | null,
+    registry: null as Registry | null,
+    io: null as SceneIO | null,
+    entities: new Map<string, { entity: Entity; spec: Spec }>(),
+  }),
+  { internal: true },
+);
 
 const isSystem = (v: unknown): v is System =>
   typeof v === 'object' && v !== null && 'run' in v && 'name' in v && 'reads' in v;

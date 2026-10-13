@@ -6,7 +6,6 @@
     "packages/input/src",
     "packages/audio/src",
     "packages/assets/src",
-    "packages/scene/src",
-    "examples"
+    "packages/scene/src"
   ]
 }

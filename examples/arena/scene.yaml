@@ -1,5 +1,5 @@
 dimension: 3d
-scripts: [./game.ts]
+scripts: [./game.tess]
 systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }

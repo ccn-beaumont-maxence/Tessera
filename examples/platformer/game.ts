@@ -18,7 +18,13 @@ export const Player = component('Player', () => ({
   spawn: vec2(),
   grounded: false,
 }));
-export const Enemy = component('Enemy', () => ({ speed: 2, range: 2, dir: 1, startX: Number.NaN }));
+export const Enemy = component('Enemy', () => ({
+  speed: 2,
+  range: 2,
+  dir: 1,
+  startX: 0,
+  ready: false,
+}));
 export const Coin = component('Coin', () => ({ value: 1 }));
 export const Goal = component('Goal', () => ({}));
 export const Follow = component('Follow', () => ({ minY: 2.5 }));
@@ -55,7 +61,10 @@ export const EnemyPatrol = system(
   'EnemyPatrol',
   [mut(RigidBody), mut(Enemy), Transform2D],
   (_w, _e, body, en, t) => {
-    if (Number.isNaN(en.startX)) en.startX = t.position.x;
+    if (!en.ready) {
+      en.startX = t.position.x;
+      en.ready = true;
+    }
     if (t.position.x > en.startX + en.range) en.dir = -1;
     if (t.position.x < en.startX - en.range) en.dir = 1;
     body.velocity.x = en.dir * en.speed;

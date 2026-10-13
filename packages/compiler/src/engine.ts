@@ -1,0 +1,97 @@
+/** Engine types visible from Tess: module to import from, kind and field types. */
+export interface StructInfo {
+  kind: 'component' | 'resource' | 'event';
+  fields: Map<string, string>;
+  module: string | null;
+}
+
+const s = (
+  kind: StructInfo['kind'],
+  module: string,
+  fields: Record<string, string>,
+): StructInfo => ({
+  kind,
+  module,
+  fields: new Map(Object.entries(fields)),
+});
+
+export const ENGINE: Record<string, StructInfo> = {
+  Transform2D: s('component', '@tessera/core', {
+    position: 'vec2',
+    rotation: 'float',
+    scale: 'vec2',
+  }),
+  Transform3D: s('component', '@tessera/core', {
+    position: 'vec3',
+    rotation: 'quat',
+    scale: 'vec3',
+  }),
+  RigidBody: s('component', '@tessera/physics', {
+    type: 'string',
+    velocity: 'vec3',
+    angularVelocity: 'vec3',
+    gravityScale: 'float',
+    linearDamping: 'float',
+    lockRotation: 'bool',
+  }),
+  Collider: s('component', '@tessera/physics', {
+    shape: 'string',
+    size: 'vec3',
+    sensor: 'bool',
+    friction: 'float',
+    restitution: 'float',
+    density: 'float',
+  }),
+  Collision: s('event', '@tessera/physics', {
+    a: 'Entity',
+    b: 'Entity',
+    started: 'bool',
+    sensor: 'bool',
+  }),
+  Sprite: s('component', '@tessera/render', {
+    image: 'string',
+    size: 'vec2',
+    color: 'color',
+    pixelsPerUnit: 'float',
+    layer: 'float',
+    columns: 'int',
+    rows: 'int',
+    frame: 'int',
+    flipX: 'bool',
+  }),
+  SpriteAnimation: s('component', '@tessera/render', { fps: 'float', loop: 'bool', time: 'float' }),
+  Mesh: s('component', '@tessera/render', {
+    shape: 'string',
+    size: 'vec3',
+    color: 'color',
+    roughness: 'float',
+    metalness: 'float',
+    model: 'string',
+  }),
+  Light: s('component', '@tessera/render', { kind: 'string', color: 'color', intensity: 'float' }),
+  Camera2D: s('component', '@tessera/render', { height: 'float' }),
+  Camera3D: s('component', '@tessera/render', { fov: 'float', near: 'float', far: 'float' }),
+};
+
+/** Component names of the value types, in storage order. */
+export const VALUE: Record<string, string[]> = {
+  vec2: ['x', 'y'],
+  vec3: ['x', 'y', 'z'],
+  quat: ['x', 'y', 'z', 'w'],
+  color: ['r', 'g', 'b', 'a'],
+};
+
+export const SCALARS = ['float', 'int', 'bool', 'string', 'Entity'];
+
+export const TS_TYPE: Record<string, string> = {
+  float: 'number',
+  int: 'number',
+  bool: 'boolean',
+  string: 'string',
+  Entity: 'number',
+  void: 'void',
+  vec2: 'Vec2',
+  vec3: 'Vec3',
+  quat: 'Quat',
+  color: 'Color',
+};

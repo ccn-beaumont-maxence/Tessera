@@ -52,7 +52,8 @@ describe('headless', () => {
   it('is deterministic for a given seed', () => {
     expect(dump(simulate(42))).toBe(dump(simulate(42)));
     expect(dump(simulate(42))).not.toBe(dump(simulate(43)));
-    expect(dump(simulate(42)).split('\n')).toHaveLength(7);
+    expect(dump(simulate(42)).split('\n')).toHaveLength(8);
+    expect(dump(simulate(42)).split('\n')[1]).toMatch(/^@Stats\{bounces:\d+\}$/);
   });
 
   it('formats values compactly', () => {
