@@ -1,0 +1,63 @@
+dimension: 2d
+scripts: [./game.tess]
+systems: [PlayerMove, EnemyPatrol, Contacts, CameraFollow]
+input:
+  move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], stick: PadLeft }
+  jump: [Space, KeyW, ArrowUp, PadA]
+physics: { gravity: [0, -25] }
+resources:
+  Score: {}
+
+prefabs:
+  Block:
+    Transform2D: {}
+    Sprite: { color: '#3a7d44' }
+    Collider: { friction: 0 }
+  Coin:
+    Transform2D: {}
+    Sprite: { size: [0.4, 0.4], color: '#ffd166', layer: 1 }
+    Collider: { shape: sphere, size: [0.4, 0.4], sensor: true }
+    Coin: {}
+  Enemy:
+    Transform2D: {}
+    Sprite: { size: [0.8, 0.8], color: '#d1495b', layer: 1 }
+    RigidBody: { lockRotation: true }
+    Collider: { size: [0.8, 0.8], friction: 0 }
+    Enemy: {}
+
+entities:
+  - name: Camera
+    Transform2D: { position: [0, 2.5] }
+    Camera2D: { height: 10 }
+    Follow: {}
+  - name: Player
+    Transform2D: { position: [0, 1] }
+    Sprite: { image: ./hero.png, columns: 4, pixelsPerUnit: 16, layer: 2 }
+    SpriteAnimation: { frames: [0, 1, 2, 1], fps: 8 }
+    RigidBody: { lockRotation: true }
+    Collider: { shape: capsule, size: [0.8, 1], friction: 0 }
+    Player: { spawn: [0, 1] }
+
+  - { name: Ground1, prefab: Block, Transform2D: { position: [5, -0.5] }, Sprite: { size: [20, 1] }, Collider: { size: [20, 1] } }
+  - { name: Ground2, prefab: Block, Transform2D: { position: [30, -0.5] }, Sprite: { size: [20, 1] }, Collider: { size: [20, 1] } }
+  - { name: Wall, prefab: Block, Transform2D: { position: [-5.5, 2] }, Sprite: { size: [1, 6] }, Collider: { size: [1, 6] } }
+  - { name: Step1, prefab: Block, Transform2D: { position: [6, 1.6] }, Sprite: { size: [3, 0.4] }, Collider: { size: [3, 0.4] } }
+  - { name: Step2, prefab: Block, Transform2D: { position: [10, 3.2] }, Sprite: { size: [3, 0.4] }, Collider: { size: [3, 0.4] } }
+  - { name: Bridge, prefab: Block, Transform2D: { position: [17.5, 1.4] }, Sprite: { size: [3, 0.4] }, Collider: { size: [3, 0.4] } }
+
+  - { prefab: Coin, Transform2D: { position: [3, 0.6] } }
+  - { prefab: Coin, Transform2D: { position: [4, 0.6] } }
+  - { prefab: Coin, Transform2D: { position: [6, 2.3] } }
+  - { prefab: Coin, Transform2D: { position: [10, 3.9] } }
+  - { prefab: Coin, Transform2D: { position: [17.5, 2.1] } }
+  - { prefab: Coin, Transform2D: { position: [24, 0.6] } }
+  - { prefab: Coin, Transform2D: { position: [25, 0.6] } }
+
+  - { name: Slime1, prefab: Enemy, Transform2D: { position: [12, 0.4] } }
+  - { name: Slime2, prefab: Enemy, Transform2D: { position: [28, 0.4] }, Enemy: { range: 3 } }
+
+  - name: Goal
+    Transform2D: { position: [38, 1] }
+    Sprite: { size: [0.3, 2], color: '#f4f1de' }
+    Collider: { size: [0.6, 2], sensor: true }
+    Goal: {}

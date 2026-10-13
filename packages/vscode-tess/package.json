@@ -1,0 +1,39 @@
+{
+  "name": "tess-language",
+  "displayName": "Tess",
+  "description": "Syntax highlighting for the Tess gameplay language (Tessera engine)",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "tessera",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "scripts": {
+    "test": "vitest run --root ../.. packages/vscode-tess/"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "tess",
+        "aliases": [
+          "Tess",
+          "tess"
+        ],
+        "extensions": [
+          ".tess"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tess",
+        "scopeName": "source.tess",
+        "path": "./syntaxes/tess.tmLanguage.json"
+      }
+    ]
+  }
+}

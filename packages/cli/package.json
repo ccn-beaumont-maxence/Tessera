@@ -1,0 +1,26 @@
+{
+  "name": "@tessera/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tess": "./bin/tess.js"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./runner": "./bin/runner.js"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. packages/cli/"
+  },
+  "dependencies": {
+    "@tessera/compiler": "workspace:*",
+    "@tessera/core": "workspace:*",
+    "@tessera/headless": "workspace:*",
+    "@tessera/render": "workspace:*",
+    "@tessera/scene": "workspace:*",
+    "playwright": "^1.64.0",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}

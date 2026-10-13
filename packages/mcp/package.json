@@ -1,0 +1,21 @@
+{
+  "name": "@tessera/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tess-mcp": "./bin/tess-mcp.js"
+  },
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --root ../.. packages/mcp/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@tessera/cli": "workspace:*",
+    "@tessera/core": "workspace:*",
+    "@tessera/headless": "workspace:*",
+    "@tessera/input": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

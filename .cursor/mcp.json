@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "tessera": { "command": "node", "args": ["packages/mcp/bin/tess-mcp.js"] }
+  }
+}

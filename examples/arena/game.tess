@@ -1,0 +1,83 @@
+component Player { float speed = 6; vec3 facing = vec3(0, 0, -1); float fireRate = 0.25; float cooldown; }
+component Enemy { float speed = 2.5; int hp = 2; }
+component Bullet { float speed = 16; float life = 1.2; }
+resource Game { int lives = 3; int kills; bool over; }
+resource Spawner { float interval = 2; float timer = 1; float radius = 9; float minInterval = 0.6; }
+
+system PlayerMove(RigidBody& body, Player& p, Transform3D& t, Game game) {
+    vec2 a = axis("move");
+    float speed = game.over ? 0 : p.speed;
+    body.velocity.x = a.x * speed;
+    body.velocity.z = -a.y * speed;
+    if (a.x != 0 || a.y != 0) p.facing = normalize(vec3(a.x, 0, -a.y));
+    t.rotation = axisAngle(vec3(0, 1, 0), atan2(-p.facing.x, -p.facing.z));
+}
+
+// Fires at the nearest enemy (auto-aim), or straight ahead when there is none.
+system Shoot(Player& p, Transform3D t, Game game) {
+    p.cooldown = max(p.cooldown - dt, 0);
+    if (game.over || !down("fire") || p.cooldown > 0) return;
+    p.cooldown = p.fireRate;
+    float dx = p.facing.x;
+    float dz = p.facing.z;
+    float best = 1000000;
+    for (Enemy en, Transform3D et : query) {
+        float ex = et.position.x - t.position.x;
+        float ez = et.position.z - t.position.z;
+        float d = len(vec2(ex, ez));
+        if (d > 0 && d < best) {
+            best = d;
+            dx = ex / d;
+            dz = ez / d;
+        }
+    }
+    spawn("Bullet",
+        Transform3D { position = vec3(t.position.x + dx * 0.8, 0.6, t.position.z + dz * 0.8) },
+        RigidBody { velocity = vec3(dx * 16, 0, dz * 16) });
+}
+
+system BulletLife(Entity e, Bullet& b) {
+    b.life -= dt;
+    if (b.life <= 0) destroy(e);
+}
+
+system EnemyChase(RigidBody& body, Enemy en, Transform3D t) {
+    for (Player p, Transform3D target : query) {
+        float dx = target.position.x - t.position.x;
+        float dz = target.position.z - t.position.z;
+        float l = len(vec2(dx, dz));
+        if (l == 0) l = 1;
+        body.velocity.x = dx / l * en.speed;
+        body.velocity.z = dz / l * en.speed;
+    }
+}
+
+system SpawnEnemies(Spawner& s, Game game) {
+    if (game.over) return;
+    s.timer -= dt;
+    if (s.timer > 0) return;
+    s.timer = s.interval;
+    s.interval = max(s.minInterval, s.interval * 0.95);
+    float angle = random(0, PI * 2);
+    spawn("Enemy", Transform3D { position = vec3(cos(angle) * s.radius, 0.6, sin(angle) * s.radius) });
+}
+
+system Hits(Entity e, Enemy& en, Game& game) {
+    for (Collision c : events<Collision>()) {
+        if (!c.started) continue;
+        Entity other = c.a == e ? c.b : (c.b == e ? c.a : none);
+        if (other == none || !alive(other) || !alive(e)) continue;
+        if (has<Bullet>(other)) {
+            destroy(other);
+            en.hp--;
+            if (en.hp <= 0) {
+                destroy(e);
+                game.kills++;
+            }
+        } else if (has<Player>(other)) {
+            destroy(e);
+            game.lives = max(game.lives - 1, 0);
+            game.over = game.lives == 0;
+        }
+    }
+}

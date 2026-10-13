@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "lib": ["ES2023", "DOM", "DOM.Iterable"] },
+  "include": [
+    "packages/render/src",
+    "packages/input/src",
+    "packages/audio/src",
+    "packages/assets/src",
+    "packages/scene/src"
+  ]
+}

@@ -1,0 +1,64 @@
+const float FALL_LIMIT = -10;
+
+component Player { float speed = 6; float jump = 11; vec2 spawn; bool grounded; }
+component Enemy { float speed = 2; float range = 2; int dir = 1; float startX; bool ready; }
+component Coin { int value = 1; }
+component Goal {}
+component Follow { float minY = 2.5; }
+resource Score { int coins; int stomps; int deaths; bool won; }
+
+void respawn(Entity e, Score& score) {
+    get<Transform2D>(e).position = get<Player>(e).spawn;
+    RigidBody& body = get<RigidBody>(e);
+    body.velocity.x = 0;
+    body.velocity.y = 0;
+    score.deaths++;
+}
+
+system PlayerMove(Entity e, RigidBody& body, Player& p, Transform2D t, Sprite& sprite, Score& score) {
+    p.grounded = raycast(t.position, vec2(0, -1), 0.6, e) != none;
+    float x = axis("move").x;
+    body.velocity.x = x * p.speed;
+    if (x != 0) sprite.flipX = x < 0;
+    if (p.grounded && pressed("jump")) body.velocity.y = p.jump;
+    if (t.position.y < FALL_LIMIT) respawn(e, score);
+}
+
+system EnemyPatrol(RigidBody& body, Enemy& en, Transform2D t) {
+    if (!en.ready) {
+        en.startX = t.position.x;
+        en.ready = true;
+    }
+    if (t.position.x > en.startX + en.range) en.dir = -1;
+    if (t.position.x < en.startX - en.range) en.dir = 1;
+    body.velocity.x = en.dir * en.speed;
+}
+
+system Contacts(Entity e, Player p, Transform2D t, RigidBody& body, Score& score) {
+    for (Collision c : events<Collision>()) {
+        if (!c.started) continue;
+        Entity other = c.a == e ? c.b : (c.b == e ? c.a : none);
+        if (other == none || !alive(other)) continue;
+        if (has<Coin>(other)) {
+            score.coins += get<Coin>(other).value;
+            destroy(other);
+        } else if (has<Enemy>(other)) {
+            if (t.position.y > get<Transform2D>(other).position.y + 0.4) {
+                destroy(other);
+                score.stomps++;
+                body.velocity.y = p.jump * 0.7;
+            } else {
+                respawn(e, score);
+            }
+        } else if (has<Goal>(other)) {
+            score.won = true;
+        }
+    }
+}
+
+system CameraFollow(Transform2D& cam, Follow f, Camera2D c) {
+    for (Player p, Transform2D t : query) {
+        cam.position.x = t.position.x;
+        cam.position.y = max(t.position.y, f.minY);
+    }
+}

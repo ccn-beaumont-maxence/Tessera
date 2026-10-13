@@ -1,0 +1,33 @@
+{
+  "name": "tessera",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.7",
+  "scripts": {
+    "dev": "tess dev examples",
+    "bench": "node benchmarks/bench.js",
+    "test": "vitest run",
+    "typecheck": "tsc && tsc -p tsconfig.dom.json && tsc -p tsconfig.node.json",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@tessera/assets": "workspace:*",
+    "@tessera/audio": "workspace:*",
+    "@tessera/cli": "workspace:*",
+    "@tessera/compiler": "workspace:*",
+    "@tessera/core": "workspace:*",
+    "@tessera/headless": "workspace:*",
+    "@tessera/input": "workspace:*",
+    "@tessera/mcp": "workspace:*",
+    "@tessera/physics": "workspace:*",
+    "@tessera/render": "workspace:*",
+    "@tessera/scene": "workspace:*",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@tessera/scene",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --root ../.. packages/scene/"
+  },
+  "dependencies": {
+    "@tessera/core": "workspace:*",
+    "@tessera/input": "workspace:*",
+    "@tessera/physics": "workspace:*",
+    "@tessera/render": "workspace:*",
+    "yaml": "^2.9.1"
+  }
+}

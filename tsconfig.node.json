@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "lib": ["ES2023", "DOM", "DOM.Iterable"], "types": ["node"] },
+  "include": [
+    "packages/cli/src",
+    "packages/mcp/src",
+    "packages/vscode-tess",
+    "examples",
+    "vitest.config.ts"
+  ]
+}
