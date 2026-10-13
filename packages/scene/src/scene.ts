@@ -22,6 +22,7 @@ import {
   Sprite,
   SpriteAnimate,
   SpriteAnimation,
+  Text,
 } from '@tessera/render';
 import {
   dirOf,
@@ -46,6 +47,7 @@ const BUILTIN_COMPONENTS: Record<string, AnyComponent> = Object.fromEntries(
     Camera2D,
     Sprite,
     SpriteAnimation,
+    Text,
     RigidBody,
     Collider,
   ].map((c) => [c.name, c as AnyComponent]),

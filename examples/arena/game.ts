@@ -1,6 +1,7 @@
 import { component, mut, quat, resource, system, Transform3D, vec3 } from '@tessera/core';
 import { axis, isDown } from '@tessera/input';
 import { Collision, RigidBody } from '@tessera/physics';
+import { Text } from '@tessera/render';
 import { spawnPrefab } from '@tessera/scene';
 
 export const Player = component('Player', () => ({
@@ -11,6 +12,7 @@ export const Player = component('Player', () => ({
 }));
 export const Enemy = component('Enemy', () => ({ speed: 2.5, hp: 2 }));
 export const Bullet = component('Bullet', () => ({ speed: 16, life: 1.2 }));
+export const Hud = component('Hud', () => ({}));
 export const Game = resource('Game', () => ({ lives: 3, kills: 0, over: false }));
 export const Spawner = resource('Spawner', () => ({
   interval: 2,
@@ -125,4 +127,14 @@ export const Hits = system(
     }
   },
   { writes: [Game], reads: [Bullet, Player] },
+);
+
+export const ShowScore = system(
+  'ShowScore',
+  [mut(Text), Hud],
+  (w, _e, t) => {
+    const g = w.resource(Game);
+    t.text = `Lives ${g.lives}  Kills ${g.kills}${g.over ? '\nGame over' : ''}`;
+  },
+  { reads: [Game] },
 );

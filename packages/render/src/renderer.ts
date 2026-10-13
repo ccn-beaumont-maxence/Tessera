@@ -11,7 +11,7 @@ import {
   type World,
 } from '@tessera/core';
 import * as THREE from 'three';
-import { Camera2D, Camera3D, Light, Mesh, Sprite } from './components';
+import { Camera2D, Camera3D, Light, Mesh, Sprite, Text } from './components';
 
 interface Prev {
   p: Vec3;
@@ -28,6 +28,40 @@ interface SpriteNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasi
   /** Frame size in pixels once the image is loaded. */
   px: { w: number; h: number } | null;
 }
+interface TextNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>> {
+  canvas: HTMLCanvasElement;
+  align: string;
+  /** Width / height of the drawn text block, and its line count. */
+  aspect: number;
+  lines: number;
+}
+
+/** Canvas pixels per text line. */
+const LINE_PX = 64;
+
+function canvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  return map;
+}
+
+/** Rasterizes white text (tinted by the material); returns width/height and line count. */
+function drawText(canvas: HTMLCanvasElement, text: string, align: string) {
+  const lines = text.split('\n');
+  const font = `bold ${LINE_PX * 0.8}px sans-serif`;
+  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+  ctx.font = font;
+  const w = Math.ceil(Math.max(1, ...lines.map((l) => ctx.measureText(l).width))) + 4;
+  canvas.width = w;
+  canvas.height = LINE_PX * lines.length;
+  ctx.font = font; // resizing resets the context state
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+  const x = align === 'left' ? 2 : align === 'right' ? w - 2 : w / 2;
+  for (const [i, l] of lines.entries()) ctx.fillText(l, x, LINE_PX * (i + 0.5));
+  return { aspect: w / canvas.height, lines: lines.length };
+}
 
 const UNIT: Record<string, () => THREE.BufferGeometry> = {
   box: () => new THREE.BoxGeometry(1, 1, 1),
@@ -36,6 +70,8 @@ const UNIT: Record<string, () => THREE.BufferGeometry> = {
   capsule: () => new THREE.CapsuleGeometry(0.5, 1, 8, 16),
   cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
 };
+
+const ORIGIN2 = { position: { x: 0, y: 0 }, rotation: 0 };
 
 const setColor = (target: THREE.Color, c: Color) =>
   target.setRGB(c.r, c.g, c.b, THREE.SRGBColorSpace);
@@ -53,6 +89,10 @@ export class Renderer {
   private readonly meshes = new Map<Entity, Node<THREE.Object3D>>();
   private readonly sprites = new Map<Entity, SpriteNode>();
   private readonly lights = new Map<Entity, Node<THREE.Light>>();
+  private readonly texts = new Map<Entity, TextNode>();
+  /** Screen-space overlay (Text with `screen: true`), drawn after the scene. */
+  private readonly hud = new THREE.Scene();
+  private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   private stamp = 0;
   private readonly p = vec3();
   private readonly q = quat();
@@ -104,7 +144,14 @@ export class Renderer {
     this.syncMeshes(alpha);
     this.syncSprites(alpha);
     this.syncLights(alpha);
+    this.syncTexts(alpha);
     this.gl.render(this.scene, this.camera(alpha));
+    if (this.hud.children.length > 0) {
+      this.gl.autoClear = false;
+      this.gl.clearDepth();
+      this.gl.render(this.hud, this.hudCamera);
+      this.gl.autoClear = true;
+    }
   }
 
   dispose(): void {
@@ -131,6 +178,23 @@ export class Renderer {
     const q = s ? quat.slerp(s.q, t.rotation, alpha, this.q) : t.rotation;
     o.position.set(p.x, p.y, p.z);
     o.quaternion.set(q.x, q.y, q.z, q.w);
+  }
+
+  /** 2D pose; `layer` sets draw order (and a tiny z so equal layers still sort). */
+  private place2(
+    e: Entity,
+    t: { position: { x: number; y: number }; rotation: number },
+    alpha: number,
+    o: THREE.Object3D,
+    layer: number,
+  ) {
+    const prev = alpha < 1 ? this.prev.get(e) : undefined;
+    const x = prev ? prev.p.x + (t.position.x - prev.p.x) * alpha : t.position.x;
+    const y = prev ? prev.p.y + (t.position.y - prev.p.y) * alpha : t.position.y;
+    const a = prev ? prev.a + (t.rotation - prev.a) * alpha : t.rotation;
+    o.position.set(x, y, layer * 0.01);
+    o.rotation.set(0, 0, a);
+    o.renderOrder = layer;
   }
 
   private syncMeshes(alpha: number): void {
@@ -224,16 +288,64 @@ export class Renderer {
         tex.repeat.set(1 / s.columns, 1 / s.rows);
         tex.offset.set(col / s.columns, 1 - (row + 1) / s.rows);
       }
-      const prev = alpha < 1 ? this.prev.get(e) : undefined;
-      const x = prev ? prev.p.x + (t.position.x - prev.p.x) * alpha : t.position.x;
-      const y = prev ? prev.p.y + (t.position.y - prev.p.y) * alpha : t.position.y;
-      const a = prev ? prev.a + (t.rotation - prev.a) * alpha : t.rotation;
-      obj.position.set(x, y, s.layer * 0.01);
-      obj.rotation.set(0, 0, a);
-      obj.renderOrder = s.layer;
+      this.place2(e, t, alpha, obj, s.layer);
       obj.scale.set(w * t.scale.x * (s.flipX ? -1 : 1), h * t.scale.y, 1);
     });
     this.sweep(this.sprites);
+  }
+
+  private syncTexts(alpha: number): void {
+    const { width, height } = this.gl.domElement;
+    const aspect = width / Math.max(height, 1);
+    this.world.each([Text], (e, t) => {
+      let n = this.texts.get(e);
+      if (!n) {
+        const canvas = document.createElement('canvas');
+        const mat = new THREE.MeshBasicMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const obj = new THREE.Mesh(this.spriteGeometry, mat);
+        n = { obj, key: '', stamp: 0, canvas, align: '', aspect: 1, lines: 1 };
+        this.texts.set(e, n);
+      }
+      n.stamp = this.stamp;
+      const { obj } = n;
+      const parent = t.screen ? this.hud : this.scene;
+      if (obj.parent !== parent) parent.add(obj);
+      if (n.key !== t.text || n.align !== t.align) {
+        Object.assign(n, drawText(n.canvas, t.text, t.align));
+        n.key = t.text;
+        n.align = t.align;
+        // A resized canvas needs a new GPU texture: three.js cannot grow one in place.
+        obj.material.map?.dispose();
+        obj.material.map = canvasTexture(n.canvas);
+      }
+      setColor(obj.material.color, t.color);
+      obj.material.opacity = t.color.a;
+      // Screen text: [-1, 1] on both axes, size in tenths of the screen height.
+      const k = t.screen ? 0.2 : 1;
+      const h = t.size * n.lines * k;
+      const w = h * n.aspect;
+      const shift = (t.align === 'left' ? w : t.align === 'right' ? -w : 0) / 2;
+      const t2 = this.world.get(e, Transform2D);
+      const t3 = t.screen ? undefined : this.world.get(e, Transform3D);
+      if (t3) {
+        this.place3(e, t3, alpha, obj);
+        obj.translateX(shift);
+        obj.scale.set(w * t3.scale.x, h * t3.scale.y, 1);
+        return;
+      }
+      if (t2) this.place2(e, t2, alpha, obj, t.layer);
+      else this.place2(e, ORIGIN2, alpha, obj, t.layer);
+      const sx = t2?.scale.x ?? 1;
+      const sy = t2?.scale.y ?? 1;
+      const ax = t.screen ? 1 / aspect : 1;
+      obj.translateX(shift * ax * sx);
+      obj.scale.set(w * ax * sx, h * sy, 1);
+    });
+    this.sweep(this.texts);
   }
 
   private syncLights(alpha: number): void {

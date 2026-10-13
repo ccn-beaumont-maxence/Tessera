@@ -10,7 +10,7 @@ import {
 } from '@tessera/core';
 import { axis, wasPressed } from '@tessera/input';
 import { Collision, RigidBody, raycast } from '@tessera/physics';
-import { Camera2D, Sprite } from '@tessera/render';
+import { Camera2D, Sprite, Text } from '@tessera/render';
 
 export const Player = component('Player', () => ({
   speed: 6,
@@ -28,6 +28,7 @@ export const Enemy = component('Enemy', () => ({
 export const Coin = component('Coin', () => ({ value: 1 }));
 export const Goal = component('Goal', () => ({}));
 export const Follow = component('Follow', () => ({ minY: 2.5 }));
+export const Hud = component('Hud', () => ({}));
 export const Score = resource('Score', () => ({ coins: 0, stomps: 0, deaths: 0, won: false }));
 
 const FALL_LIMIT = -10;
@@ -110,4 +111,14 @@ export const CameraFollow = system(
       cam.position.y = Math.max(t.position.y, f.minY);
     });
   },
+);
+
+export const ShowScore = system(
+  'ShowScore',
+  [mut(Text), Hud],
+  (w, _e, t) => {
+    const s = w.resource(Score);
+    t.text = s.won ? 'You win!' : `Coins ${s.coins}  Deaths ${s.deaths}`;
+  },
+  { reads: [Score] },
 );

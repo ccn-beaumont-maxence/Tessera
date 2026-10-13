@@ -60,6 +60,14 @@ export const ENGINE: Record<string, StructInfo> = {
     flipX: 'bool',
   }),
   SpriteAnimation: s('component', '@tessera/render', { fps: 'float', loop: 'bool', time: 'float' }),
+  Text: s('component', '@tessera/render', {
+    text: 'string',
+    size: 'float',
+    color: 'color',
+    align: 'string',
+    layer: 'float',
+    screen: 'bool',
+  }),
   Mesh: s('component', '@tessera/render', {
     shape: 'string',
     size: 'vec3',

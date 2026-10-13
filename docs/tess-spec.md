@@ -64,7 +64,7 @@ void respawn(Entity e, Score& score) { get<Transform2D>(e).position = vec2(0, 1)
 Parameters are read-only; component and resource parameters may be `T&` (passed by reference).
 
 `if/else`, `while`, `for (init; cond; step)`, `break`, `continue`, `return`, `? :`,
-`+ - * / %`, `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
+`+ - * / %` (`+` with a string concatenates: `"Coins " + n`), `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
 
 Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (combine),
 `q * v` (rotate). Fields `.x .y .z .w`, `.r .g .b .a`.
@@ -90,7 +90,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,
 `Transform3D {position, rotation, scale}`, `RigidBody {type, velocity, angularVelocity,
 gravityScale, linearDamping, lockRotation}`, `Collider {shape, size, sensor, friction,
-restitution, density}`, `Sprite`, `SpriteAnimation`, `Mesh`, `Light`, `Camera2D`, `Camera3D`.
+restitution, density}`, `Sprite`, `SpriteAnimation`, `Text {text, size, color, align, layer, screen}`, `Mesh`, `Light`, `Camera2D`, `Camera3D`.
 Engine event: `Collision {Entity a; Entity b; bool started; bool sensor;}`.
 
 Conventions: Y up, meters, radians, 3D forward is -Z.

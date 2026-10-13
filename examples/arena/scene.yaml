@@ -1,6 +1,6 @@
 dimension: 3d
 scripts: [./game.tess]
-systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits]
+systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits, ShowScore]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
   fire: [Space, MouseLeft, PadRT]
@@ -30,6 +30,10 @@ entities:
   - name: Camera
     Transform3D: { position: [0, 22, 15], rotation: [-0.98, 0, 0] }
     Camera3D: { fov: 55 }
+  - name: Hud
+    Transform2D: { position: [-0.95, 0.9] }
+    Text: { screen: true, align: left, size: 0.6 }
+    Hud: {}
   - name: Sun
     Transform3D: { position: [0, 10, 0], rotation: [-1.0, 0.4, 0] }
     Light: { intensity: 2.5 }

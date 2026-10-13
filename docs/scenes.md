@@ -43,6 +43,7 @@ to the YAML file. Only the fields you write change; the rest keep the component 
 | Transform2D | position [0,0], rotation 0 (radians), scale [1,1] |
 | Transform3D | position [0,0,0], rotation identity, scale [1,1,1] |
 | Sprite | image '', size [1,1] (used without image), color white, pixelsPerUnit 100, layer 0 (higher on top), columns 1, rows 1, frame 0, flipX false |
+| Text | text '', size 0.5 (line height), color white, align left/center/right, layer 0, screen false (true: HUD over everything, Transform2D position in [-1,1] with y up, size in tenths of screen height) |
 | SpriteAnimation | frames [0], fps 10, loop true |
 | Camera2D | height 10 (visible meters) |
 | Mesh | shape box/sphere/plane/capsule/cylinder, size [1,1,1], color white, roughness 0.8, metalness 0, model '' (glTF path) |

@@ -133,3 +133,37 @@ Acceptation : résultats reproductibles avec un seul script.
 État : `pnpm bench` est prêt (comptage de tokens, 4 tâches × 2 langages, contrôles headless,
 `benchmarks/RESULTS.md`). `pnpm bench --oracle` valide tâches et contrôles hors ligne (8/8).
 L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
+
+## Phase 10 : Texte et HUD
+- [x] Composant `Text` (monde 2D/3D, ou `screen: true` en surimpression), rendu canvas
+- [x] HUD dans le platformer et l'arène
+
+## Phase 11 : Hiérarchie
+- [ ] Composant `Parent`, transforms locaux, destruction en cascade, `children:` en YAML
+
+## Phase 12 : Changement de scène
+- [ ] `loadScene("x.yaml")` différé en fin de frame, ressources conservées sur demande
+
+## Phase 13 : Timers et tweens
+- [ ] `Timer` + événement `TimerDone`, `Tween` avec easing
+
+## Phase 14 : Pointeur dans le monde
+- [ ] `mouse()` en coordonnées monde (2D), `mouseRay()` (3D)
+
+## Phase 15 : Raycast riche
+- [ ] `raycast` renvoie `RayHit {entity, point, normal, distance}`, `overlap` en Tess
+
+## Phase 16 : Tilemap 2D
+- [ ] Composant `Tilemap`, un seul mesh, colliders fusionnés
+
+## Phase 17 : Particules
+- [ ] Composant `Particles`, pool fixe, RNG du monde, `burst(e, n)`
+
+## Phase 18 : Animations glTF
+- [ ] Composant `Animator` (clips glTF), temps piloté par la simulation
+
+## Phase 19 : Audio avancé
+- [ ] `stop`, volume et hauteur par son, son spatial 3D
+
+## Phase 20 : Sauvegarde
+- [ ] `save(key, value)` / `load(key, default)`, localStorage ou mémoire en headless
