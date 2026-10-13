@@ -86,3 +86,7 @@ system Hits(Entity e, Enemy& en, Game& game) {
 system ShowScore(Text& t, Hud h, Game game) {
     t.text = "Lives " + game.lives + "  Kills " + game.kills + (game.over ? "\nGame over" : "");
 }
+
+system Restart(Game game) {
+    if (game.over && pressed("fire")) loadScene("scene.yaml");
+}

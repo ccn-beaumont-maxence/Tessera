@@ -68,6 +68,10 @@ describe('type errors', () => {
     ['void f() { if (vec2(1, 2)) {} }', 'condition must be bool, got vec2'],
     ['void f() { break; }', '`break` outside of a loop'],
     [
+      'component H { float v; }\nvoid f() { loadScene("a.yaml", H); }',
+      'loadScene keeps resources by name: loadScene("level2.yaml", Score)',
+    ],
+    [
       'component H { float v; }\nsystem S(H h) { for (H o : query) { break; } }',
       '`break` cannot leave a query loop',
     ],

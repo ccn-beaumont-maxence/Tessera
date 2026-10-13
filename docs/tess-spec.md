@@ -85,6 +85,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Input | `down("jump")`, `pressed("jump")`, `released("jump")`, `axis("move")` (vec2, y up) |
 | Physics | `raycast(origin, dir, maxDist, exclude = none)` returns the hit Entity or `none` |
 | Audio | `play("coin.wav")`, `music("theme.ogg")` |
+| Scenes | `loadScene("level2.yaml", Score, ...)` at the end of the frame: everything is replaced except the listed resources (path relative to the current scene; list it under `scenes:`) |
 | Debug | `log(a, b, ...)` |
 
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,

@@ -1,6 +1,6 @@
 dimension: 3d
 scripts: [./game.tess]
-systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits, ShowScore]
+systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits, ShowScore, Restart]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
   fire: [Space, MouseLeft, PadRT]

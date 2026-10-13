@@ -142,7 +142,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] Composant `Parent`, transforms locaux, destruction en cascade, `children:` en YAML
 
 ## Phase 12 : Changement de scène
-- [ ] `loadScene("x.yaml")` différé en fin de frame, ressources conservées sur demande
+- [x] `loadScene("x.yaml", Score)` différé en fin de frame, scènes préchargées via `scenes:`
 
 ## Phase 13 : Timers et tweens
 - [ ] `Timer` + événement `TimerDone`, `Tween` avec easing

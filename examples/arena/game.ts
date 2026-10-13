@@ -1,8 +1,17 @@
-import { component, mut, quat, resource, system, Transform3D, vec3 } from '@tessera/core';
-import { axis, isDown } from '@tessera/input';
+import {
+  component,
+  mut,
+  quat,
+  resource,
+  type System,
+  system,
+  Transform3D,
+  vec3,
+} from '@tessera/core';
+import { axis, isDown, wasPressed } from '@tessera/input';
 import { Collision, RigidBody } from '@tessera/physics';
 import { Text } from '@tessera/render';
-import { spawnPrefab } from '@tessera/scene';
+import { loadScene, spawnPrefab } from '@tessera/scene';
 
 export const Player = component('Player', () => ({
   speed: 6,
@@ -138,3 +147,12 @@ export const ShowScore = system(
   },
   { reads: [Game] },
 );
+
+export const Restart: System = {
+  name: 'Restart',
+  reads: [Game],
+  writes: [],
+  run: (w) => {
+    if (w.resource(Game).over && wasPressed(w, 'fire')) loadScene(w, 'scene.yaml');
+  },
+};

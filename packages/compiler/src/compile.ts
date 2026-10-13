@@ -1246,6 +1246,22 @@ class Compiler {
           js: `${this.use('@tessera/audio', n === 'play' ? 'playSound' : 'playMusic')}($w, ${url})`,
         };
       }
+      case 'loadScene': {
+        this.needsWorld(e, b, n);
+        const [path, ...keep] = e.args;
+        if (!path) return this.fail('loadScene needs a scene path: loadScene("level2.yaml")', e);
+        const p = this.expr(path, b);
+        this.expectType(p, 'string', path);
+        const names = keep.map((k) => {
+          if (k.kind !== 'ident' || this.struct(k.name)?.kind !== 'resource')
+            this.fail('loadScene keeps resources by name: loadScene("level2.yaml", Score)', k);
+          return k.name;
+        });
+        return {
+          ty: 'void',
+          js: `${this.use('@tessera/scene', 'loadScene')}($w, ${p.js}, [${names.join(', ')}])`,
+        };
+      }
       case 'log':
         return {
           ty: 'void',
@@ -1287,6 +1303,7 @@ class Compiler {
         'raycast',
         'play',
         'music',
+        'loadScene',
         'log',
         'euler',
         'axisAngle',

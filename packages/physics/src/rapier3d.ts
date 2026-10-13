@@ -131,6 +131,11 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
     return this.rw.getCollider(handle)?.isSensor() ?? false;
   }
 
+  dispose(): void {
+    this.queue.free();
+    this.rw.free();
+  }
+
   raycast(origin: Point, dir: Point, max: number, opts: RayOptions): RayHit | null {
     const len = Math.hypot(dir.x, dir.y, dir.z ?? 0) || 1;
     const d = { x: dir.x / len, y: dir.y / len, z: (dir.z ?? 0) / len };

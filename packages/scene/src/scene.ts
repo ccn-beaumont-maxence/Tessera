@@ -14,7 +14,7 @@ import {
   type World,
 } from '@tessera/core';
 import { addInput, type Bindings } from '@tessera/input';
-import { addPhysics, Collider, RigidBody } from '@tessera/physics';
+import { Collider, loadPhysics, RigidBody, startPhysics } from '@tessera/physics';
 import {
   Camera2D,
   Camera3D,
@@ -62,6 +62,12 @@ interface Registry {
   systems: Record<string, System>;
 }
 
+/** A parsed scene with its scripts loaded: instantiating it needs no I/O. */
+interface Prepared {
+  parsed: Parsed;
+  registry: Registry;
+}
+
 const SceneState = resource(
   'Scene',
   () => ({
@@ -69,6 +75,9 @@ const SceneState = resource(
     registry: null as Registry | null,
     io: null as SceneIO | null,
     entities: new Map<string, { entity: Entity; spec: Spec }>(),
+    /** Every scene loadScene() may switch to, by path. */
+    scenes: new Map<string, Prepared>(),
+    next: null as { path: string; keep: readonly ResourceType<unknown>[] } | null,
   }),
   { internal: true },
 );
@@ -182,24 +191,65 @@ const usesAny = (p: Parsed, names: string[]) =>
     names.some((n) => n in s),
   );
 
-/** Populates `world` from a parsed scene: resources, systems (in order), entities. */
-export async function build(world: World, parsed: Parsed, io: SceneIO): Promise<void> {
+/** Loads scripts and physics, and checks names, so that instantiate() cannot need I/O. */
+async function prepare(parsed: Parsed, io: SceneIO): Promise<Prepared> {
   const r = await registry(parsed, io);
+  for (const [i, name] of parsed.systems.entries()) {
+    if (!r.systems[name] && !['Input', 'Physics'].includes(name))
+      parsed.loc
+        .at('systems', i)
+        .fail(`unknown system "${name}"${suggest(name, Object.keys(r.systems))}`);
+  }
+  for (const name of Object.keys(parsed.resources)) {
+    if (!r.resources[name])
+      parsed.loc
+        .at('resources', name)
+        .fail(`unknown resource "${name}"${suggest(name, Object.keys(r.resources))}`);
+  }
+  for (const def of parsed.entities)
+    for (const name of Object.keys(def.spec)) componentType(r, name, def.loc.at(name));
+  if (usesPhysics(parsed)) await loadPhysics(parsed.dimension);
+  return { parsed, registry: r };
+}
+
+const usesPhysics = (p: Parsed) => p.physics !== null || usesAny(p, ['RigidBody', 'Collider']);
+
+/**
+ * Populates `world` from a parsed scene: resources, systems (in order), entities.
+ * Scenes listed in `scenes:` (recursively) are loaded too, ready for loadScene().
+ */
+export async function build(world: World, parsed: Parsed, io: SceneIO): Promise<void> {
   const state = world.resource(SceneState);
-  Object.assign(state, { parsed, registry: r, io });
+  state.io = io;
+  state.scenes.set(parsed.path, await prepare(parsed, io));
+  const todo = [...parsed.scenes];
+  for (let path = todo.shift(); path; path = todo.shift()) {
+    if (state.scenes.has(path)) continue;
+    const p = await parseScene(path, io);
+    if (p.dimension !== parsed.dimension)
+      parsed.loc
+        .at('scenes')
+        .fail(`${path} is ${p.dimension}, scenes must all be ${parsed.dimension}`);
+    state.scenes.set(path, await prepare(p, io));
+    todo.push(...p.scenes);
+  }
+  instantiate(world, state.scenes.get(parsed.path) as Prepared);
+}
+
+function instantiate(world: World, { parsed, registry: r }: Prepared): void {
+  const state = world.resource(SceneState);
+  const io = state.io as SceneIO;
+  Object.assign(state, { parsed, registry: r });
+  state.entities.clear();
 
   for (const [name, fields] of Object.entries(parsed.resources)) {
-    const l = parsed.loc.at('resources', name);
-    const type = r.resources[name];
-    if (!type)
-      return l.fail(`unknown resource "${name}"${suggest(name, Object.keys(r.resources))}`);
-    convert(world.resource(type), fields, l, name, io);
+    const type = r.resources[name] as ResourceType<unknown>;
+    convert(world.resource(type), fields, parsed.loc.at('resources', name), name, io);
   }
 
   const order = [...parsed.systems];
   if (parsed.input && !order.includes('Input')) order.unshift('Input');
-  const physics = parsed.physics !== null || usesAny(parsed, ['RigidBody', 'Collider']);
-  if (physics && !order.includes('Physics')) order.push('Physics');
+  if (usesPhysics(parsed) && !order.includes('Physics')) order.push('Physics');
   if (usesAny(parsed, ['SpriteAnimation']) && !order.includes('SpriteAnimate'))
     order.push('SpriteAnimate');
   for (const name of order) {
@@ -207,21 +257,15 @@ export async function build(world: World, parsed: Parsed, io: SceneIO): Promise<
       addInput(world, (parsed.input ?? {}) as Bindings);
     } else if (name === 'Physics') {
       const g = parsed.physics?.gravity;
-      await addPhysics(world, {
+      startPhysics(world, {
         dimension: parsed.dimension,
         gravity: g ? vec3(g[0] ?? 0, g[1] ?? 0, g[2] ?? 0) : vec3(0, -9.81, 0),
       });
     } else {
-      const s = r.systems[name];
-      if (!s) {
-        const i = parsed.systems.indexOf(name);
-        return parsed.loc
-          .at('systems', i)
-          .fail(`unknown system "${name}"${suggest(name, Object.keys(r.systems))}`);
-      }
-      world.addSystem(s);
+      world.addSystem(r.systems[name] as System);
     }
   }
+  world.addSystem(SceneLoad);
 
   for (const def of parsed.entities) {
     const e = world.spawn(def.name);
@@ -230,6 +274,47 @@ export async function build(world: World, parsed: Parsed, io: SceneIO): Promise<
     link(world, e, def);
   }
 }
+
+/** Last system of every scene: applies a pending loadScene(). */
+const SceneLoad: System = {
+  name: 'SceneLoad',
+  reads: [],
+  writes: [],
+  run(world) {
+    const state = world.resource(SceneState);
+    const next = state.next;
+    if (!next) return;
+    state.next = null;
+    world.clear(next.keep);
+    instantiate(world, state.scenes.get(next.path) as Prepared);
+  },
+};
+
+/**
+ * Switches to another scene at the end of the current step: entities, systems and resources
+ * are replaced, except the resources in `keep`. `path` is relative to the current scene file
+ * and must be the current scene or listed under `scenes:`.
+ */
+export function loadScene(
+  world: World,
+  path: string,
+  keep: readonly ResourceType<unknown>[] = [],
+): void {
+  const state = world.resource(SceneState);
+  if (!state.parsed) throw new Error(`loadScene("${path}"): no scene loaded in this world`);
+  const full = join(dirOf(state.parsed.path), path);
+  if (!state.scenes.has(full)) {
+    const known = [...state.scenes.keys()].map((k) => k.slice(k.lastIndexOf('/') + 1));
+    throw new Error(
+      `loadScene("${path}"): unknown scene; list it under \`scenes:\` in the first scene (loaded: ${known.join(', ')})`,
+    );
+  }
+  state.next = { path: full, keep };
+}
+
+/** Path of the scene currently instantiated in `world`, or null. */
+export const currentScene = (world: World): string | null =>
+  world.resource(SceneState).parsed?.path ?? null;
 
 /** Sets the Parent of an entity declared under `children:`. */
 function link(world: World, e: Entity, def: EntityDef): void {
@@ -251,7 +336,8 @@ export function reload(world: World, next: Parsed): boolean {
   const r = state.registry;
   const io = state.io;
   if (!prev || !r || !io) throw new Error('scene: reload() needs a world built by build()');
-  for (const k of ['dimension', 'scripts', 'systems', 'input', 'physics'] as const) {
+  if (prev?.path !== next.path) return false;
+  for (const k of ['dimension', 'scripts', 'systems', 'input', 'physics', 'scenes'] as const) {
     if (!same(prev[k], next[k])) return false;
   }
 

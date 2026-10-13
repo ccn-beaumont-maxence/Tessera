@@ -165,7 +165,7 @@ export class World {
   private readonly stores = new Map<ComponentType<unknown>, Store>();
   private readonly resources = new Map<ResourceType<unknown>, unknown>();
   private readonly queues = new Map<EventType<unknown>, { cur: unknown[]; prev: unknown[] }>();
-  private readonly systems: System[] = [];
+  private systems: System[] = [];
   private locked = 0;
 
   constructor(options: { seed?: number } = {}) {
@@ -301,6 +301,22 @@ export class World {
         throw new Error(`addSystem: a system named "${s.name}" is already scheduled`);
       }
       this.systems.push(s);
+    }
+  }
+
+  /**
+   * Empties the world for another scene: entities, systems, pending events and game resources
+   * (except `keep`). Engine-internal resources stay; frame, time, RNG and entity ids continue.
+   * Safe from inside a system: the systems of the current step finish on the old list.
+   */
+  clear(keep: readonly ResourceType<unknown>[] = []): void {
+    if (this.locked > 0) throw new Error('clear: not allowed while iterating entities');
+    this.names.clear();
+    this.stores.clear();
+    this.queues.clear();
+    this.systems = [];
+    for (const type of [...this.resources.keys()]) {
+      if (!type.internal && !keep.includes(type)) this.resources.delete(type);
     }
   }
 

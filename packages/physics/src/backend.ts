@@ -41,6 +41,8 @@ export abstract class Backend<B extends Handle, C extends Handle> {
 
   abstract raycast(origin: Point, dir: Point, max: number, opts: RayOptions): RayHit | null;
   abstract overlap(shape: Shape, size: Point, position: Point): Entity[];
+  /** Frees the Rapier world (WASM memory). */
+  abstract dispose(): void;
   protected abstract createBody(w: World, e: Entity, type: string): B;
   protected abstract createCollider(e: Entity, c: ColliderData, body: B): C;
   protected abstract removeBody(body: B): void;

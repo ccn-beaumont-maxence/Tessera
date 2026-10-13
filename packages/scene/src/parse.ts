@@ -57,6 +57,8 @@ export interface Parsed {
   path: string;
   dimension: '2d' | '3d';
   scripts: string[];
+  /** Other scenes loadScene() may switch to (absolute paths). */
+  scenes: string[];
   systems: string[];
   input: Record<string, unknown> | null;
   physics: { gravity?: number[] } | null;
@@ -71,6 +73,7 @@ export interface Parsed {
 const TOP_KEYS = [
   'dimension',
   'scripts',
+  'scenes',
   'systems',
   'input',
   'physics',
@@ -206,6 +209,7 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
     path,
     dimension,
     scripts: list('scripts').map((s) => join(dir, s)),
+    scenes: list('scenes').map((s) => join(dir, s)),
     systems: list('systems'),
     input: input as Record<string, unknown> | null,
     physics: physics as Parsed['physics'],

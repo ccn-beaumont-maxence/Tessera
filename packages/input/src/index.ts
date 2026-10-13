@@ -64,8 +64,12 @@ export function addInput(world: World, bindings: Bindings): void {
   const s = world.resource(InputState);
   s.bindings = bindings;
   world.addSystem({ name: 'Input', reads: [], writes: [InputState], run: update });
-  if (typeof window !== 'undefined') attach(world);
+  if (typeof window !== 'undefined' && !attached.has(s)) attach(world);
+  attached.add(s);
 }
+
+/** Input states already listening to the DOM (a scene change calls addInput again). */
+const attached = new WeakSet<object>();
 
 function update(world: World): void {
   const s = world.resource(InputState);
@@ -179,9 +183,8 @@ function attach(world: World): void {
     }
     return set;
   };
-  const keys = bound();
   window.addEventListener('keydown', (e) => {
-    if (keys.has(e.code)) e.preventDefault();
+    if (bound().has(e.code)) e.preventDefault();
     s.buttons.add(e.code);
   });
   window.addEventListener('keyup', (e) => s.buttons.delete(e.code));

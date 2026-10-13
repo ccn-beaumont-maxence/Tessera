@@ -20,6 +20,10 @@ describe('arena', () => {
     const enemies = findAll(w, 'Enemy').length;
     runFrames(w, 300);
     expect(findAll(w, 'Enemy').length).toBe(enemies);
+    press(w, 'fire');
+    runFrames(w, 2);
+    expect(w.resource(Game)).toEqual({ lives: 3, kills: 0, over: false });
+    expect(findAll(w, 'Enemy')).toHaveLength(0);
   });
 
   it('auto-aims at the nearest enemy and kills enemies', async () => {

@@ -1,9 +1,9 @@
 import type { World } from '@tessera/core';
 import { parseScene, type SceneIO } from './parse';
-import { reload } from './scene';
+import { currentScene, reload } from './scene';
 
 export { mergeSpec, type Parsed, parseScene, type SceneIO, type Spec } from './parse';
-export { build, reload, sceneGame, spawnPrefab } from './scene';
+export { build, currentScene, loadScene, reload, sceneGame, spawnPrefab } from './scene';
 
 /** Browser IO through the Vite dev server (`/@fs` serves absolute paths). */
 export const browserIO: SceneIO = {
@@ -23,7 +23,7 @@ export function watch(world: World, path: string, io: SceneIO = browserIO): void
   const hot = (import.meta as ImportMeta & { hot?: Hot }).hot;
   hot?.on('tess:yaml', async ({ file }) => {
     try {
-      const next = await parseScene(path, io);
+      const next = await parseScene(currentScene(world) ?? path, io);
       if (!next.files.includes(file)) return;
       if (!reload(world, next)) location.reload();
       else console.info(`tess: applied ${file}`);
