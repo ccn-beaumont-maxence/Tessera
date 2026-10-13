@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { launch, pageUrl, serve } from '@tessera/cli';
 import { z } from 'zod';
 
-const INSTRUCTIONS = `Inspect and drive a running Tessera game.
+const INSTRUCTIONS = `Inspect and drive a running Tessera game. Call \`open\` first unless a game was given at startup.
 Start with \`state\` (one line per entity: #id Name Component{non-default fields}; @Resource lines).
 \`inspect\` shows every field of one entity. \`step\` pauses and advances N fixed frames (60/s).
 \`set\` edits a component or resource field. \`input\` holds or releases an action or key.
@@ -63,13 +63,16 @@ export interface TessServer {
   close(): Promise<void>;
 }
 
-/** MCP server driving `entry` (a scene .yaml or game .ts) in Chromium, optionally visible. */
+/**
+ * MCP server driving a game (scene .yaml or game .ts) in Chromium, optionally visible.
+ * Without `entry`, the agent picks the game with the `open` tool.
+ */
 export async function createTessServer(
-  entry: string,
+  entry?: string,
   options: { headed?: boolean; seed?: number } = {},
 ): Promise<TessServer> {
-  const path = resolve(entry);
-  const vite = await serve(dirname(path));
+  let path = entry ? resolve(entry) : null;
+  const vite = await serve(entry ? dirname(resolve(entry)) : process.cwd());
   const browser = await launch(!options.headed);
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const require = createRequire(import.meta.url);
@@ -82,6 +85,7 @@ export async function createTessServer(
   page.on('pageerror', (e) => logs.push(`error: ${e.message}`));
 
   const open = async () => {
+    if (!path) throw new Error('no game open: call `open` with a scene .yaml or a main .ts path');
     await page.goto(pageUrl(vite, path, `&seed=${options.seed ?? 1}`));
     const status = await page
       .waitForFunction(() => (globalThis as { __tess?: string }).__tess, null, { timeout: 60_000 })
@@ -90,16 +94,18 @@ export async function createTessServer(
     await page.addScriptTag({ type: 'module', content: ops });
     await page.waitForFunction(() => (globalThis as { __mcpReady?: boolean }).__mcpReady);
   };
-  await open();
+  if (path) await open();
 
-  const op = (name: string, args: Record<string, unknown>) =>
-    page.evaluate(
+  const op = async (name: string, args: Record<string, unknown>) => {
+    if (!path) throw new Error('no game open: call `open` with a scene .yaml or a main .ts path');
+    return page.evaluate(
       ([n, a]) => {
         const g = globalThis as unknown as { __mcp: Record<string, (a: unknown) => string> };
         return (g.__mcp[n as string] as (a: unknown) => string)(a);
       },
       [name, args] as const,
     );
+  };
   const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 
   const server = new McpServer(
@@ -109,6 +115,20 @@ export async function createTessServer(
   const entity = z.number().int().describe('entity id, the number after # in state lines');
   const filter = z.string().optional().describe('only entity lines containing this text');
 
+  server.registerTool(
+    'open',
+    {
+      description:
+        'Start a game: path to a scene .yaml or a main .ts (relative to the project root).',
+      inputSchema: { entry: z.string() },
+    },
+    async (a) => {
+      path = resolve(a.entry);
+      logs = [];
+      await open();
+      return text(await op('state', {}));
+    },
+  );
   server.registerTool(
     'state',
     {

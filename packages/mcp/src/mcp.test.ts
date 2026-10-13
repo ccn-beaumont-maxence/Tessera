@@ -41,6 +41,7 @@ describe('tess-mcp', () => {
       'input',
       'inspect',
       'logs',
+      'open',
       'reload',
       'run',
       'screenshot',
@@ -94,6 +95,30 @@ describe('tess-mcp', () => {
       call('set', { entity: player, component: 'Nope', field: 'x', value: 1 }),
     ).rejects.toThrow('has no Nope');
     expect(await call('reload')).toContain('@Score{}');
+    expect(await call('open', { entry: join(dir, 'scene.yaml') })).toMatch(/^paused: false/);
     expect(await call('logs')).toBe('(no logs)');
+  });
+});
+
+describe('tess-mcp without a startup game', () => {
+  it('asks for open, then runs the game', { timeout: 60_000 }, async () => {
+    const idle = await createTessServer();
+    const c = new Client({ name: 'idle', version: '0' });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await idle.server.connect(a);
+    await c.connect(b);
+    try {
+      const res = await c.callTool({ name: 'state', arguments: {} });
+      expect(res.isError).toBe(true);
+      expect(JSON.stringify(res.content)).toContain('call `open`');
+      const opened = await c.callTool({
+        name: 'open',
+        arguments: { entry: 'examples/arena/scene.yaml' },
+      });
+      expect(JSON.stringify(opened.content)).toContain('@Game{}');
+    } finally {
+      await c.close();
+      await idle.close();
+    }
   });
 });

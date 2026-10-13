@@ -1,0 +1,10 @@
+---
+description: Writing Tessera games (Tess gameplay code and YAML scenes)
+globs: **/*.tess, **/scene.yaml, examples/**/*.yaml
+alwaysApply: false
+---
+
+Before editing, read `docs/tess-spec.md` (Tess language) and `docs/scenes.md` (scene format).
+After each change, check with `pnpm exec tess run <scene.yaml> --frames 120 --dump`
+(and `--screenshot out.png` to see it). Errors are `file:line: message` with the fix.
+Use the `tessera` MCP server (`open`, `state`, `step`, `inspect`, `logs`) to debug a running game.

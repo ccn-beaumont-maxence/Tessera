@@ -2,7 +2,8 @@
 
 Web 2D/3D game engine designed to be driven by AI agents: games are YAML scenes plus gameplay
 code in **Tess** (C++-flavored, compiled to TypeScript) or TypeScript. See [PLAN.md](PLAN.md)
-and the language spec in [docs/tess-spec.md](docs/tess-spec.md).
+the language spec in [docs/tess-spec.md](docs/tess-spec.md) and the scene format in
+[docs/scenes.md](docs/scenes.md). Agent instructions: [AGENTS.md](AGENTS.md).
 
 ```sh
 pnpm install
@@ -16,10 +17,12 @@ pnpm bench --oracle                         # validate the benchmark offline; `p
 
 ## MCP server
 
-Lets an agent inspect and drive a running game (state, inspect, set, step, input, screenshot, logs):
+Lets an agent inspect and drive a running game (open, state, inspect, set, step, input,
+screenshot, logs). Preconfigured for Claude Code (`.mcp.json`) and Cursor (`.cursor/mcp.json`);
+see AGENTS.md for Codex. The agent picks the game with `open`, or pass a scene path as argument:
 
 ```json
-{ "mcpServers": { "tessera": { "command": "node", "args": ["packages/mcp/bin/tess-mcp.js", "examples/platformer/scene.yaml"] } } }
+{ "mcpServers": { "tessera": { "command": "node", "args": ["packages/mcp/bin/tess-mcp.js"] } } }
 ```
 
 Add `--headed` to watch the game in a browser window.
