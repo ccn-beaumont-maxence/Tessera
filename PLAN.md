@@ -76,8 +76,8 @@ Acceptation : une scène complète est définie sans une ligne de code de
 câblage, et modifier le YAML met le jeu à jour sans recharger la page.
 
 ## Phase 6 : Jeux de référence en TypeScript
-- [ ] Platformer 2D (déplacement, saut, ennemis, pièces, score)
-- [ ] Arène 3D (déplacement, tir, ennemis avec IA simple, vies)
+- [x] Platformer 2D (déplacement, saut, ennemis, pièces, score)
+- [x] Arène 3D (déplacement, tir, ennemis avec IA simple, vies)
 Acceptation : les deux jeux sont jouables et testés en headless.
 Ils serviront de référence pour le benchmark de la phase 9.
 

@@ -127,3 +127,39 @@ describe('YAML scenes', () => {
     }
   });
 });
+
+describe('reference games in the browser', () => {
+  it('responds to keyboard input', { timeout: 60_000 }, async () => {
+    const entry = resolve(import.meta.dirname, '../../../examples/platformer/scene.yaml');
+    const server = await serve(resolve(entry, '..'));
+    const browser = await launch();
+    try {
+      const page = await browser.newPage();
+      await page.goto(pageUrl(server, entry));
+      await page.waitForFunction(() => (globalThis as { __tess?: string }).__tess === 'done');
+      const playerX = () =>
+        page.evaluate(() => {
+          type W = {
+            entities(): Iterable<number>;
+            nameOf(e: number): string;
+            components(e: number): [{ name: string }, { position: { x: number } }][];
+          };
+          const w = (globalThis as unknown as { tess: { world: W } }).tess.world;
+          for (const e of w.entities()) {
+            if (w.nameOf(e) !== 'Player') continue;
+            const t = w.components(e).find(([c]) => c.name === 'Transform2D');
+            return t?.[1].position.x ?? NaN;
+          }
+          return NaN;
+        });
+      const before = await playerX();
+      await page.keyboard.down('ArrowRight');
+      await page.waitForTimeout(700);
+      await page.keyboard.up('ArrowRight');
+      expect((await playerX()) - before).toBeGreaterThan(1);
+    } finally {
+      await browser.close();
+      await server.close();
+    }
+  });
+});

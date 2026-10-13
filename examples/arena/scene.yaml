@@ -1,0 +1,51 @@
+dimension: 3d
+scripts: [./game.ts]
+systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits]
+input:
+  move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
+  fire: [Space, MouseLeft, PadRT]
+resources:
+  Game: {}
+  Spawner: {}
+
+prefabs:
+  Wall:
+    Transform3D: {}
+    Mesh: { color: '#4a4e69' }
+    Collider: {}
+  Bullet:
+    Transform3D: {}
+    Mesh: { shape: sphere, size: [0.25, 0.25, 0.25], color: '#ffd166' }
+    RigidBody: { gravityScale: 0 }
+    Collider: { shape: sphere, size: [0.25, 0.25, 0.25], sensor: true }
+    Bullet: {}
+  Enemy:
+    Transform3D: {}
+    Mesh: { shape: capsule, size: [0.8, 1.2, 0.8], color: '#d1495b' }
+    RigidBody: { lockRotation: true }
+    Collider: { shape: capsule, size: [0.8, 1.2, 0.8] }
+    Enemy: {}
+
+entities:
+  - name: Camera
+    Transform3D: { position: [0, 22, 15], rotation: [-0.98, 0, 0] }
+    Camera3D: { fov: 55 }
+  - name: Sun
+    Transform3D: { position: [0, 10, 0], rotation: [-1.0, 0.4, 0] }
+    Light: { intensity: 2.5 }
+  - name: Ambient
+    Light: { kind: ambient, intensity: 0.5 }
+  - name: Floor
+    Transform3D: { position: [0, -0.5, 0] }
+    Mesh: { size: [24, 1, 24], color: '#22333b' }
+    Collider: { size: [24, 1, 24] }
+  - { name: WallN, prefab: Wall, Transform3D: { position: [0, 1, -12] }, Mesh: { size: [24, 2, 1] }, Collider: { size: [24, 2, 1] } }
+  - { name: WallS, prefab: Wall, Transform3D: { position: [0, 1, 12] }, Mesh: { size: [24, 2, 1] }, Collider: { size: [24, 2, 1] } }
+  - { name: WallE, prefab: Wall, Transform3D: { position: [12, 1, 0] }, Mesh: { size: [1, 2, 24] }, Collider: { size: [1, 2, 24] } }
+  - { name: WallW, prefab: Wall, Transform3D: { position: [-12, 1, 0] }, Mesh: { size: [1, 2, 24] }, Collider: { size: [1, 2, 24] } }
+  - name: Player
+    Transform3D: { position: [0, 0.8, 0] }
+    Mesh: { shape: capsule, size: [0.8, 1.6, 0.8], color: '#81b29a' }
+    RigidBody: { lockRotation: true }
+    Collider: { shape: capsule, size: [0.8, 1.6, 0.8] }
+    Player: {}
