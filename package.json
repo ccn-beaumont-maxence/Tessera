@@ -15,6 +15,7 @@
     "@tessera/cli": "workspace:*",
     "@tessera/core": "workspace:*",
     "@tessera/headless": "workspace:*",
+    "@tessera/physics": "workspace:*",
     "@tessera/render": "workspace:*",
     "@types/node": "^26.6.5",
     "@vitest/coverage-v8": "^5.0.4",

@@ -20,6 +20,9 @@ importers:
       '@tessera/headless':
         specifier: workspace:*
         version: link:packages/headless
+      '@tessera/physics':
+        specifier: workspace:*
+        version: link:packages/physics
       '@tessera/render':
         specifier: workspace:*
         version: link:packages/render
@@ -61,6 +64,18 @@ importers:
 
   packages/headless:
     dependencies:
+      '@tessera/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/physics:
+    dependencies:
+      '@dimforge/rapier2d-compat':
+        specifier: ^0.21.0
+        version: 0.21.0
+      '@dimforge/rapier3d-compat':
+        specifier: ^0.21.0
+        version: 0.21.0
       '@tessera/core':
         specifier: workspace:*
         version: link:../core
@@ -158,8 +173,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@dimforge/rapier2d-compat@0.21.0':
+    resolution: {integrity: sha512-cMStLQZbY5D/ajAPjOwTwoYuAJAungTYB45MNFEa5B+LGaMiZfxLwjHsfpxH5B0sDa+gkmcQFJJKiHNKnlpMnA==}
+
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
+
+  '@dimforge/rapier3d-compat@0.21.0':
+    resolution: {integrity: sha512-tCl1HPGwOhn5aCQbgqWbOH+Nx/5fnr3IPAnzQuR7zIhC/raqi2yxC6LhvZqjdI2El5hQgY5RDAwDrAjAi2FdPA==}
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -786,7 +807,11 @@ snapshots:
   '@biomejs/cli-win32-x64@2.5.15':
     optional: true
 
+  '@dimforge/rapier2d-compat@0.21.0': {}
+
   '@dimforge/rapier3d-compat@0.12.0': {}
+
+  '@dimforge/rapier3d-compat@0.21.0': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
 

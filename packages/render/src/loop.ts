@@ -19,9 +19,9 @@ export interface Running {
 const MAX_STEPS_PER_FRAME = 5;
 
 /** Runs `game` at a fixed 60 Hz step with interpolated rendering. */
-export function start(game: Game, options: StartOptions): Running {
+export async function start(game: Game, options: StartOptions): Promise<Running> {
   const world = new World({ seed: options.seed ?? 1 });
-  game.setup(world);
+  await game.setup(world);
   const renderer = new Renderer(world, options.canvas, game.dimension);
   let raf = 0;
   const stop = () => cancelAnimationFrame(raf);

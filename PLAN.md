@@ -61,9 +61,9 @@ Acceptation : un exemple 2D et un exemple 3D s'affichent, et
 `tess run <scene> --frames 120 --screenshot out.png` produit une image.
 
 ## Phase 4 : Physique
-- [ ] Rapier 2D et 3D derrière une API commune
-- [ ] RigidBody, Collider, événements de collision et de déclencheur
-- [ ] Raycasts, requêtes de forme
+- [x] Rapier 2D et 3D derrière une API commune
+- [x] RigidBody, Collider, événements de collision et de déclencheur
+- [x] Raycasts, requêtes de forme
 Acceptation : tests headless de chute, de collision et de raycast, en 2D
 et en 3D, déterministes.
 

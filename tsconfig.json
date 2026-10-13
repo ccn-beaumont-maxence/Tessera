@@ -14,5 +14,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["packages/core/src", "packages/headless/src"]
+  "include": ["packages/core/src", "packages/headless/src", "packages/physics/src"]
 }

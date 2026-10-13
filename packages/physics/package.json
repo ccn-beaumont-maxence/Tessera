@@ -1,0 +1,15 @@
+{
+  "name": "@tessera/physics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --root ../.. packages/physics/"
+  },
+  "dependencies": {
+    "@dimforge/rapier2d-compat": "^0.21.0",
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "@tessera/core": "workspace:*"
+  }
+}

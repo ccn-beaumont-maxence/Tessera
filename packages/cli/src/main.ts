@@ -48,7 +48,7 @@ async function run(argv: string[]): Promise<number> {
   }
   if (values.dump || !values.screenshot) {
     const world = new World({ seed });
-    (await loadGame(path)).setup(world);
+    await (await loadGame(path)).setup(world);
     runFrames(world, frames);
     console.log(values.dump ? dump(world) : `ran ${frames} frames`);
   }
@@ -89,7 +89,7 @@ try {
   const { start } = await import('/@fs${render}');
   const game = (await import('/@fs' + q.get('entry'))).default;
   const frames = q.has('frames') ? Number(q.get('frames')) : undefined;
-  window.tess = start(game, { canvas: document.getElementById('c'), frames, seed: Number(q.get('seed') ?? 1) });
+  window.tess = await start(game, { canvas: document.getElementById('c'), frames, seed: Number(q.get('seed') ?? 1) });
   await window.tess.ready;
   window.__tess = 'done';
 } catch (e) { window.__tess = String(e && e.stack || e); console.error(e); }
