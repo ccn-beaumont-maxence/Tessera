@@ -19,6 +19,7 @@
     "@tessera/core": "workspace:*",
     "@tessera/headless": "workspace:*",
     "@tessera/input": "workspace:*",
+    "@tessera/mcp": "workspace:*",
     "@tessera/physics": "workspace:*",
     "@tessera/render": "workspace:*",
     "@tessera/scene": "workspace:*",

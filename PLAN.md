@@ -113,11 +113,11 @@ de façon identique (mêmes dumps headless), et toute erreur pointe vers le
 fichier `.tess` d'origine.
 
 ## Phase 8 : Outillage pour agents
-- [ ] CLI : `tess dev`, `tess build`, `tess test`,
+- [x] CLI : `tess dev`, `tess build`, `tess test`,
       `tess run <scene> --frames N --dump --screenshot`
-- [ ] Serveur MCP : lister les entités, lire et modifier un composant,
+- [x] Serveur MCP : lister les entités, lire et modifier un composant,
       avancer de N frames, capturer l'écran
-- [ ] Coloration syntaxique VS Code (grammaire TextMate)
+- [x] Coloration syntaxique VS Code (grammaire TextMate)
 Acceptation : un agent peut diagnostiquer un bug sur un jeu en cours
 d'exécution uniquement via le MCP.
 

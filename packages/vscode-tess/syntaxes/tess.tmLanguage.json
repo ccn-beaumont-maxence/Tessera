@@ -1,0 +1,80 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Tess",
+  "scopeName": "source.tess",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#declarations" },
+    { "include": "#statements" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.tess", "match": "//.*$" },
+        { "name": "comment.block.tess", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(component|resource|event|system)\\s+([A-Za-z_]\\w*)",
+          "captures": {
+            "1": { "name": "storage.type.$1.tess" },
+            "2": { "name": "entity.name.type.tess" }
+          }
+        },
+        {
+          "match": "\\b(const)\\b",
+          "name": "storage.modifier.tess"
+        },
+        {
+          "match": "\\b([A-Za-z_]\\w*)\\s+([A-Za-z_]\\w*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "storage.type.tess" },
+            "2": { "name": "entity.name.function.tess" }
+          }
+        }
+      ]
+    },
+    "statements": {
+      "patterns": [
+        { "include": "#comments" },
+        {
+          "name": "string.quoted.double.tess",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "name": "constant.character.escape.tess", "match": "\\\\." }]
+        },
+        {
+          "name": "keyword.control.tess",
+          "match": "\\b(if|else|while|for|break|continue|return|query)\\b"
+        },
+        { "name": "constant.language.tess", "match": "\\b(true|false|none|PI)\\b" },
+        { "name": "variable.language.tess", "match": "\\b(dt|time|frame)\\b" },
+        {
+          "name": "storage.type.primitive.tess",
+          "match": "\\b(float|int|bool|string|void|auto|Entity|vec2|vec3|quat|color)\\b"
+        },
+        {
+          "name": "support.function.builtin.tess",
+          "match": "\\b(abs|min|max|clamp|floor|ceil|round|sqrt|pow|sin|cos|tan|atan2|lerp|len|dist|dot|cross|normalize|euler|axisAngle|random|randomInt|spawn|destroy|alive|has|get|add|remove|events|emit|down|pressed|released|axis|raycast|play|music|log)\\b(?=\\s*[<(])"
+        },
+        {
+          "name": "support.class.engine.tess",
+          "match": "\\b(Transform2D|Transform3D|RigidBody|Collider|Collision|Sprite|SpriteAnimation|Mesh|Light|Camera2D|Camera3D)\\b"
+        },
+        { "name": "entity.name.type.tess", "match": "\\b[A-Z]\\w*\\b" },
+        {
+          "name": "constant.numeric.tess",
+          "match": "\\b\\d+(\\.\\d*)?([eE][+-]?\\d+)?f?\\b|\\.\\d+\\b"
+        },
+        { "name": "keyword.operator.reference.tess", "match": "&(?!&)" },
+        { "name": "keyword.operator.tess", "match": "[-+*/%=!<>]=?|&&|\\|\\||\\?|:" },
+        {
+          "name": "invalid.illegal.cpp.tess",
+          "match": "->|::|#\\w+|\\b(new|delete|nullptr|class|struct|std)\\b"
+        }
+      ]
+    }
+  }
+}

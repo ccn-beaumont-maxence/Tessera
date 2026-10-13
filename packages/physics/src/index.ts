@@ -1,8 +1,6 @@
 import { type Entity, resource, type Vec3, vec3, type World } from '@tessera/core';
 import type { Backend, Point, RayHit, RayOptions } from './backend';
 import type { Shape } from './components';
-import { init2d, Physics2D } from './rapier2d';
-import { init3d, Physics3D } from './rapier3d';
 
 export type { Point, RayHit, RayOptions } from './backend';
 export * from './components';
@@ -23,10 +21,13 @@ export async function addPhysics(
 ): Promise<void> {
   const gravity = options.gravity ?? vec3(0, -9.81, 0);
   let backend: AnyBackend;
+  // Dynamic imports: a game only downloads the Rapier build for its dimension.
   if (options.dimension === '2d') {
+    const { init2d, Physics2D } = await import('./rapier2d');
     await init2d();
     backend = new Physics2D(gravity) as AnyBackend;
   } else {
+    const { init3d, Physics3D } = await import('./rapier3d');
     await init3d();
     backend = new Physics3D(gravity) as AnyBackend;
   }

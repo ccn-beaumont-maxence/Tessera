@@ -163,3 +163,50 @@ describe('reference games in the browser', () => {
     }
   });
 });
+
+describe('tess build and tess test', () => {
+  it('builds a static site that runs the game', { timeout: 120_000 }, async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const out = mkdtempSync(join(tmpdir(), 'tess-dist-'));
+    const scene = resolve(import.meta.dirname, '../../../examples/arena/scene.yaml');
+    expect(await main(['build', scene, '--out', out])).toBe(0);
+    const { preview } = await import('vite');
+    const server = await preview({
+      configFile: false,
+      logLevel: 'error',
+      root: out,
+      build: { outDir: out },
+      preview: { port: 0 },
+    });
+    const browser = await launch();
+    try {
+      const page = await browser.newPage();
+      await page.goto(server.resolvedUrls?.local[0] ?? '');
+      await page.waitForFunction(
+        () => (globalThis as { __tess?: string }).__tess === 'done',
+        null,
+        { timeout: 30_000 },
+      );
+      await page.waitForTimeout(500);
+      const frame = await page.evaluate(
+        () => (globalThis as unknown as { tess: { world: { frame: number } } }).tess.world.frame,
+      );
+      expect(frame).toBeGreaterThan(5);
+    } finally {
+      await browser.close();
+      await server.close();
+    }
+  });
+
+  it('runs project tests with .tess support', { timeout: 120_000 }, async () => {
+    const { spawnSync } = await import('node:child_process');
+    const bin = resolve(import.meta.dirname, '../bin/tess.js');
+    const root = resolve(import.meta.dirname, '../../..');
+    const res = spawnSync('node', [bin, 'test', 'examples/parity'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    expect(res.stdout + res.stderr).toContain('2 passed');
+    expect(res.status).toBe(0);
+  });
+});

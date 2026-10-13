@@ -8,10 +8,14 @@ import { dump, runFrames } from '@tessera/headless';
 import { sceneGame } from '@tessera/scene';
 import { chromium } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
+import { startVitest } from 'vitest/node';
+import { buildGame } from './build';
 
 const USAGE = `usage:
   tess run <entry> [--frames N] [--seed S] [--dump] [--screenshot out.png]
-  tess dev <entry|dir> [--port P]`;
+  tess dev <entry|dir> [--port P]
+  tess build <entry> [--out dist]
+  tess test [filters...]`;
 
 /** Imports a module inside the CLI's module graph, so games share engine module instances. */
 export type Importer = (path: string) => Promise<Record<string, unknown>>;
@@ -23,6 +27,8 @@ export async function main(argv: string[], load?: Importer): Promise<number> {
   try {
     if (command === 'run') return await run(rest);
     if (command === 'dev') return await dev(rest);
+    if (command === 'build') return await buildCommand(rest);
+    if (command === 'test') return await test(rest);
     console.error(USAGE);
     return command === undefined || command === '--help' ? 0 : 1;
   } catch (err) {
@@ -186,8 +192,9 @@ export async function screenshot(
   }
 }
 
-export const launch = () =>
+export const launch = (headless = true) =>
   chromium.launch({
+    headless,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
 
@@ -220,4 +227,32 @@ async function dev(argv: string[]): Promise<number> {
   }
   await new Promise(() => {});
   return 0;
+}
+
+async function buildCommand(argv: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: { out: { type: 'string', default: 'dist' } },
+  });
+  const entry = positionals[0];
+  if (!entry) throw new Error(`missing <entry>\n${USAGE}`);
+  await buildGame(entry, values.out);
+  console.log(`built ${resolve(values.out)}`);
+  return 0;
+}
+
+/** Runs Vitest once; .tess modules compile unless the project's own config already does it. */
+async function test(filters: string[]): Promise<number> {
+  const own = ['vitest.config.ts', 'vitest.config.js', 'vite.config.ts', 'vite.config.js'].some(
+    (f) => existsSync(f),
+  );
+  const vitest = await startVitest(
+    'test',
+    filters,
+    { run: true, ...(own ? {} : { config: false }) },
+    own ? {} : { plugins: [tess()] },
+  );
+  await vitest.close();
+  return process.exitCode === undefined || process.exitCode === 0 ? 0 : 1;
 }
