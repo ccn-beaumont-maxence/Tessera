@@ -3,12 +3,15 @@ import {
   type Color,
   compose2D,
   compose3D,
+  type DeepReadonly,
   type Entity,
   type Pose2D,
   type Pose3D,
   parentOf,
   type Quat,
   quat,
+  Tilemap,
+  type TilemapData,
   Transform2D,
   Transform3D,
   type Vec3,
@@ -33,6 +36,45 @@ interface SpriteNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasi
   /** Frame size in pixels once the image is loaded. */
   px: { w: number; h: number } | null;
 }
+interface TilemapNode extends Node<THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>> {
+  /** Inputs of the current geometry: rebuilt when one changes. */
+  tiles: readonly string[];
+  size: number;
+  chars: string;
+  columns: number;
+  rows: number;
+}
+
+/** One quad per drawn tile, top-left corner at the origin, UVs picking spritesheet frames. */
+function tileGeometry(t: DeepReadonly<TilemapData>): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const index: number[] = [];
+  const s = t.size;
+  for (const [r, row] of t.tiles.entries()) {
+    for (let c = 0; c < row.length; c++) {
+      const f = t.chars.indexOf(row[c] as string);
+      if (f < 0) continue;
+      const fc = f % t.columns;
+      const fr = Math.floor(f / t.columns) % t.rows;
+      const u0 = fc / t.columns;
+      const u1 = (fc + 1) / t.columns;
+      const v0 = 1 - (fr + 1) / t.rows;
+      const v1 = 1 - fr / t.rows;
+      const i = pos.length / 3;
+      pos.push(c * s, -(r + 1) * s, 0, (c + 1) * s, -(r + 1) * s, 0);
+      pos.push((c + 1) * s, -r * s, 0, c * s, -r * s, 0);
+      uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+      index.push(i, i + 1, i + 2, i, i + 2, i + 3);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(index);
+  return g;
+}
+
 interface TextNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>> {
   canvas: HTMLCanvasElement;
   align: string;
@@ -95,6 +137,7 @@ export class Renderer {
   private readonly sprites = new Map<Entity, SpriteNode>();
   private readonly lights = new Map<Entity, Node<THREE.Light>>();
   private readonly texts = new Map<Entity, TextNode>();
+  private readonly tilemaps = new Map<Entity, TilemapNode>();
   /** Screen-space overlay (Text with `screen: true`), drawn after the scene. */
   private readonly hud = new THREE.Scene();
   private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
@@ -150,6 +193,7 @@ export class Renderer {
     this.resize();
     this.syncMeshes(alpha);
     this.syncSprites(alpha);
+    this.syncTilemaps(alpha);
     this.syncLights(alpha);
     this.syncTexts(alpha);
     this.gl.render(this.scene, this.camera(alpha));
@@ -332,6 +376,54 @@ export class Renderer {
     this.sweep(this.sprites);
   }
 
+  private syncTilemaps(alpha: number): void {
+    this.world.each([Transform2D, Tilemap], (e, t, m) => {
+      let n = this.tilemaps.get(e);
+      if (!n || n.key !== m.image) {
+        if (n) this.drop(n);
+        const mat = new THREE.MeshBasicMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const obj = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+        this.scene.add(obj);
+        if (m.image) {
+          obj.visible = false;
+          loadTexture(m.image).then(
+            (base) => {
+              mat.map = base.clone();
+              mat.map.needsUpdate = true;
+              mat.needsUpdate = true;
+              obj.visible = true;
+            },
+            (err: unknown) => console.error(`Tilemap.image: ${String(err)}`),
+          );
+        }
+        n = { obj, key: m.image, stamp: 0, tiles: [], size: 0, chars: '', columns: 0, rows: 0 };
+        this.tilemaps.set(e, n);
+      }
+      n.stamp = this.stamp;
+      if (
+        n.tiles !== m.tiles ||
+        n.size !== m.size ||
+        n.chars !== m.chars ||
+        n.columns !== m.columns ||
+        n.rows !== m.rows
+      ) {
+        n.obj.geometry.dispose();
+        n.obj.geometry = tileGeometry(m);
+        Object.assign(n, { tiles: m.tiles, size: m.size, chars: m.chars });
+        Object.assign(n, { columns: m.columns, rows: m.rows });
+      }
+      setColor(n.obj.material.color, m.color);
+      n.obj.material.opacity = m.color.a;
+      const { scale } = this.place2(e, t, alpha, n.obj, m.layer);
+      n.obj.scale.set(scale.x, scale.y, 1);
+    });
+    this.sweep(this.tilemaps);
+  }
+
   private syncTexts(alpha: number): void {
     const { width, height } = this.gl.domElement;
     const aspect = width / Math.max(height, 1);
@@ -491,6 +583,11 @@ export class Renderer {
     n.obj.removeFromParent();
     if (n.obj instanceof THREE.DirectionalLight) n.obj.target.removeFromParent();
     if (n.obj instanceof THREE.Mesh) {
+      if (
+        n.obj.geometry !== this.spriteGeometry &&
+        ![...this.geometries.values()].includes(n.obj.geometry)
+      )
+        n.obj.geometry.dispose();
       const mat = n.obj.material as THREE.Material & { map?: THREE.Texture | null };
       mat.map?.dispose();
       mat.dispose();

@@ -65,6 +65,21 @@ export class Physics2D extends Backend<R.RigidBody, R.Collider> {
     return this.rw.createCollider(desc, body);
   }
 
+  protected createBox(
+    body: R.RigidBody,
+    x: number,
+    y: number,
+    hw: number,
+    hh: number,
+    friction: number,
+  ) {
+    const desc = R.ColliderDesc.cuboid(hw, hh)
+      .setTranslation(x, y)
+      .setFriction(friction)
+      .setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    return this.rw.createCollider(desc, body);
+  }
+
   protected removeBody(body: R.RigidBody): void {
     this.rw.removeRigidBody(body);
   }

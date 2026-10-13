@@ -1,4 +1,4 @@
-import type { Entity, Vec2, Vec3, World } from '@tessera/core';
+import { type Entity, Tilemap, tileRects, type Vec2, type Vec3, type World } from '@tessera/core';
 import { Collider, Collision, RigidBody, type Shape } from './components';
 
 export interface RayHit {
@@ -46,6 +46,11 @@ export interface Rec<B, C> {
 export abstract class Backend<B extends Handle, C extends Handle> {
   protected readonly recs = new Map<Entity, Rec<B, C>>();
   protected readonly owners = new Map<number, Entity>();
+  /** Static body per Tilemap, rebuilt when its tiles, size or friction change. */
+  private readonly maps = new Map<
+    Entity,
+    { body: B; colliders: C[]; tiles: readonly string[]; size: number; friction: number }
+  >();
 
   abstract raycast(origin: Point, dir: Point, max: number, opts: RayOptions): RayHit | null;
   abstract overlap(shape: Shape, size: Point, position: Point): Entity[];
@@ -55,6 +60,15 @@ export abstract class Backend<B extends Handle, C extends Handle> {
   protected abstract createCollider(e: Entity, c: ColliderData, body: B): C;
   protected abstract removeBody(body: B): void;
   protected abstract removeCollider(c: C): void;
+  /** Fixed box collider centered at (x, y) in the body's frame. */
+  protected abstract createBox(
+    body: B,
+    x: number,
+    y: number,
+    hw: number,
+    hh: number,
+    friction: number,
+  ): C;
   protected abstract push(w: World, e: Entity, rec: Rec<B, C>): void;
   protected abstract simulate(
     w: World,
@@ -90,6 +104,34 @@ export abstract class Backend<B extends Handle, C extends Handle> {
     }
     w.each([RigidBody], (e) => this.ensure(w, e));
     w.each([Collider], (e) => this.ensure(w, e));
+    this.syncMaps(w);
+  }
+
+  private syncMaps(w: World): void {
+    for (const [e, m] of this.maps) {
+      const t = w.get(e, Tilemap);
+      if (t && t.tiles === m.tiles && t.size === m.size && t.friction === m.friction) continue;
+      for (const c of m.colliders) this.owners.delete(c.handle);
+      this.removeBody(m.body);
+      this.maps.delete(e);
+    }
+    w.each([Tilemap], (e, t) => {
+      if (this.maps.has(e)) return;
+      const body = this.createBody(w, e, 'fixed');
+      const colliders = tileRects(t).map((r) => {
+        const c = this.createBox(
+          body,
+          (r.col + r.w / 2) * t.size,
+          -(r.row + r.h / 2) * t.size,
+          (r.w * t.size) / 2,
+          (r.h * t.size) / 2,
+          t.friction,
+        );
+        this.owners.set(c.handle, e);
+        return c;
+      });
+      this.maps.set(e, { body, colliders, tiles: t.tiles, size: t.size, friction: t.friction });
+    });
   }
 
   private ensure(w: World, e: Entity): void {

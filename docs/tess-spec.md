@@ -91,7 +91,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,
 `Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `Timer {duration, time, repeat, destroy, done}`, `RigidBody {type, velocity, angularVelocity,
 gravityScale, linearDamping, lockRotation}`, `Collider {shape, size, sensor, friction,
-restitution, density}`, `Sprite`, `SpriteAnimation`, `Text {text, size, color, align, layer, screen}`, `Mesh`, `Light`, `Camera2D`, `Camera3D`.
+restitution, density}`, `Sprite`, `SpriteAnimation`, `Text {text, size, color, align, layer, screen}`, `Tilemap`, `Mesh`, `Light`, `Camera2D`, `Camera3D`.
 Engine event: `Collision {Entity a; Entity b; bool started; bool sensor;}`.
 
 Conventions: Y up, meters, radians, 3D forward is -Z.

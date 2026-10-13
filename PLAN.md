@@ -154,7 +154,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] `raycast` renvoie `RayHit {entity, point, normal, distance}`, `overlap` en Tess
 
 ## Phase 16 : Tilemap 2D
-- [ ] Composant `Tilemap`, un seul mesh, colliders fusionnés
+- [x] Composant `Tilemap`, un seul mesh, colliders fusionnés ; sol du platformer en tilemap
 
 ## Phase 17 : Particules
 - [ ] Composant `Particles`, pool fixe, RNG du monde, `burst(e, n)`

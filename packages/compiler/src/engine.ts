@@ -77,6 +77,17 @@ export const ENGINE: Record<string, StructInfo> = {
     layer: 'float',
     screen: 'bool',
   }),
+  Tilemap: s('component', '@tessera/core', {
+    chars: 'string',
+    passable: 'string',
+    size: 'float',
+    image: 'string',
+    columns: 'int',
+    rows: 'int',
+    color: 'color',
+    layer: 'float',
+    friction: 'float',
+  }),
   Mesh: s('component', '@tessera/render', {
     shape: 'string',
     size: 'vec3',

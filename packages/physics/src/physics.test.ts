@@ -1,4 +1,4 @@
-import { Transform2D, Transform3D, vec2, vec3, World } from '@tessera/core';
+import { Tilemap, Transform2D, Transform3D, vec2, vec3, World } from '@tessera/core';
 import { dump, find, runFrames } from '@tessera/headless';
 import { describe, expect, it } from 'vitest';
 import { addPhysics, Collider, Collision, overlap, RigidBody, raycast } from './index';
@@ -151,5 +151,27 @@ describe('physics errors', () => {
     w.add(g, Transform3D);
     w.add(g, Collider, { shape: 'cone' as never });
     expect(() => runFrames(w, 1)).toThrow('unknown shape "cone"');
+  });
+});
+
+describe('tilemap', () => {
+  it('collides with merged tiles, reports the map entity, and rebuilds on edit', async () => {
+    const w = new World();
+    await addPhysics(w, { dimension: '2d' });
+    const map = w.spawn('Level');
+    w.add(map, Transform2D, { position: vec2(-5, 0) });
+    const tiles = w.add(map, Tilemap, { tiles: ['..........', '##########'], size: 1 });
+    const box = w.spawn('Box');
+    w.add(box, Transform2D, { position: vec2(0, 3) });
+    w.add(box, RigidBody);
+    w.add(box, Collider);
+    runFrames(w, 120);
+    expect(y(w, 'Box')).toBeCloseTo(-0.5, 1);
+    expect(raycast(w, vec2(0, 3), vec2(0, -1))?.entity).toBe(box);
+    expect(raycast(w, vec2(-4.5, 3), vec2(0, -1))?.entity).toBe(map);
+    expect(raycast(w, vec2(-4.5, -0.5), vec2(0, -1))?.distance).toBeCloseTo(0.5);
+    tiles.tiles = ['..........', '..........', '##########'];
+    runFrames(w, 1);
+    expect(raycast(w, vec2(-4.5, -0.5), vec2(0, -1))?.distance).toBeCloseTo(1.5);
   });
 });

@@ -8,6 +8,7 @@ import {
   type ResourceType,
   resource,
   type System,
+  Tilemap,
   Timer,
   Timers,
   Transform2D,
@@ -47,6 +48,7 @@ const BUILTIN_COMPONENTS: Record<string, AnyComponent> = Object.fromEntries(
     Transform3D,
     Parent,
     Timer,
+    Tilemap,
     Mesh,
     Light,
     Camera3D,
@@ -215,7 +217,8 @@ async function prepare(parsed: Parsed, io: SceneIO): Promise<Prepared> {
   return { parsed, registry: r };
 }
 
-const usesPhysics = (p: Parsed) => p.physics !== null || usesAny(p, ['RigidBody', 'Collider']);
+const usesPhysics = (p: Parsed) =>
+  p.physics !== null || usesAny(p, ['RigidBody', 'Collider', 'Tilemap']);
 
 /**
  * Populates `world` from a parsed scene: resources, systems (in order), entities.
