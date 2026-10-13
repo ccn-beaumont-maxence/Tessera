@@ -1,10 +1,17 @@
 #!/usr/bin/env node
-// Loads the TypeScript CLI through Vite's module runner (no build step, no extra loader dependency).
+// Runs the TypeScript CLI through one Vite module runner. Games, scenes and scripts are imported
+// through the same runner, so they share engine module instances (component identity).
 import { fileURLToPath } from 'node:url';
-import { runnerImport } from 'vite';
+import { createServer, createServerModuleRunner } from 'vite';
 
-const { module } = await runnerImport(fileURLToPath(new URL('../src/main.ts', import.meta.url)), {
+const server = await createServer({
   configFile: false,
   logLevel: 'error',
+  appType: 'custom',
+  server: { middlewareMode: true, hmr: false, ws: false },
 });
-process.exitCode = await module.main(process.argv.slice(2));
+const runner = createServerModuleRunner(server.environments.ssr, { hmr: false });
+const cli = await runner.import(fileURLToPath(new URL('../src/main.ts', import.meta.url)));
+process.exitCode = await cli.main(process.argv.slice(2), (path) => runner.import(path));
+await runner.close();
+await server.close();

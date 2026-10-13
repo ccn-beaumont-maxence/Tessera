@@ -14,6 +14,7 @@
     "@tessera/core": "workspace:*",
     "@tessera/headless": "workspace:*",
     "@tessera/render": "workspace:*",
+    "@tessera/scene": "workspace:*",
     "playwright": "^1.64.0",
     "vite": "^8.3.4"
   }

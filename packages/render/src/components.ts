@@ -1,12 +1,16 @@
 import { color, component, mut, system, vec2, vec3 } from '@tessera/core';
 
-/** Primitive 3D shape, sized in meters (sphere/capsule/cylinder use size.x as diameter). */
+/**
+ * Primitive 3D shape sized in meters (sphere/capsule/cylinder use size.x as diameter),
+ * or a glTF `model` URL (size then scales the model; color/roughness/metalness are ignored).
+ */
 export const Mesh = component('Mesh', () => ({
   shape: 'box' as 'box' | 'sphere' | 'plane' | 'capsule' | 'cylinder',
   size: vec3(1, 1, 1),
   color: color(),
   roughness: 0.8,
   metalness: 0,
+  model: '',
 }));
 
 /** Lights shine along the entity's forward (-Z) when directional. */

@@ -27,12 +27,28 @@ const isVector = (keys: string[]) =>
   keys.length <= 4 &&
   (keys.every((k, i) => k === 'xyzw'[i]) || (keys.length === 4 && keys.join('') === 'rgba'));
 
-/** One line: `#12 Player Transform2D{position:(3,1.5) rotation:0 scale:(1,1)} Health{value:80}`. */
+/** Component fields that differ from the defaults, e.g. `{position:(3,1.5)}`. */
+function formatComponent(defaults: unknown, value: unknown): string {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    defaults === null ||
+    typeof defaults !== 'object'
+  ) {
+    return `(${formatValue(value)})`;
+  }
+  const d = defaults as Record<string, unknown>;
+  const fields = Object.entries(value).filter(([k, v]) => formatValue(v) !== formatValue(d[k]));
+  return `{${fields.map(([k, v]) => `${k}:${formatValue(v)}`).join(' ')}}`;
+}
+
+/** One line, default-valued fields omitted: `#12 Player Transform2D{position:(3,1.5)} Health{value:80}`. */
 export function dumpEntity(world: World, e: Entity): string {
   const name = world.nameOf(e);
   const parts = [`#${e}`];
   if (name) parts.push(name);
-  for (const [type, value] of world.components(e)) parts.push(type.name + formatValue(value));
+  for (const [type, value] of world.components(e))
+    parts.push(type.name + formatComponent(type.create(), value));
   return parts.join(' ');
 }
 

@@ -1,3 +1,4 @@
+import { loaded, loadModel, loadTexture } from '@tessera/assets';
 import {
   type Color,
   type Entity,
@@ -48,10 +49,8 @@ export class Renderer {
   private readonly defaultLights = new THREE.Group();
   private readonly geometries = new Map<string, THREE.BufferGeometry>();
   private readonly spriteGeometry = new THREE.PlaneGeometry(1, 1);
-  private readonly textures = new Map<string, Promise<THREE.Texture>>();
-  private readonly pending = new Set<Promise<unknown>>();
   private readonly prev = new Map<Entity, Prev>();
-  private readonly meshes = new Map<Entity, Node<THREE.Mesh>>();
+  private readonly meshes = new Map<Entity, Node<THREE.Object3D>>();
   private readonly sprites = new Map<Entity, SpriteNode>();
   private readonly lights = new Map<Entity, Node<THREE.Light>>();
   private stamp = 0;
@@ -93,9 +92,9 @@ export class Renderer {
     for (const e of this.prev.keys()) if (!this.world.alive(e)) this.prev.delete(e);
   }
 
-  /** Resolves once every texture requested so far has loaded. */
+  /** Resolves once every asset requested so far has loaded. */
   async ready(): Promise<void> {
-    while (this.pending.size > 0) await Promise.all(this.pending);
+    await loaded();
   }
 
   /** Draws the world; `alpha` in [0,1] blends from the last capture to the current state. */
@@ -137,25 +136,46 @@ export class Renderer {
   private syncMeshes(alpha: number): void {
     this.world.each([Transform3D, Mesh], (e, t, m) => {
       let n = this.meshes.get(e);
-      if (!n || n.key !== m.shape) {
+      const key = m.model || m.shape;
+      if (!n || n.key !== key) {
         if (n) this.drop(n);
-        const obj = new THREE.Mesh(this.geometry(m.shape), new THREE.MeshStandardMaterial());
+        const obj = m.model
+          ? this.model(m.model)
+          : new THREE.Mesh(this.geometry(m.shape), new THREE.MeshStandardMaterial());
         obj.castShadow = obj.receiveShadow = true;
         this.scene.add(obj);
-        n = { obj, key: m.shape, stamp: 0 };
+        n = { obj, key, stamp: 0 };
         this.meshes.set(e, n);
       }
       n.stamp = this.stamp;
-      const mat = n.obj.material as THREE.MeshStandardMaterial;
-      setColor(mat.color, m.color);
-      mat.opacity = m.color.a;
-      mat.transparent = m.color.a < 1;
-      mat.roughness = m.roughness;
-      mat.metalness = m.metalness;
+      if (n.obj instanceof THREE.Mesh) {
+        const mat = n.obj.material as THREE.MeshStandardMaterial;
+        setColor(mat.color, m.color);
+        mat.opacity = m.color.a;
+        mat.transparent = m.color.a < 1;
+        mat.roughness = m.roughness;
+        mat.metalness = m.metalness;
+      }
       this.place3(e, t, alpha, n.obj);
       n.obj.scale.set(t.scale.x * m.size.x, t.scale.y * m.size.y, t.scale.z * m.size.z);
     });
     this.sweep(this.meshes);
+  }
+
+  /** Group that receives a clone of the glTF scene once loaded. */
+  private model(url: string): THREE.Group {
+    const group = new THREE.Group();
+    loadModel(url).then(
+      (gltf) => {
+        const scene = gltf.scene.clone(true);
+        scene.traverse((o) => {
+          o.castShadow = o.receiveShadow = true;
+        });
+        group.add(scene);
+      },
+      (err: unknown) => console.error(`Mesh.model: ${String(err)}`),
+    );
+    return group;
   }
 
   private syncSprites(alpha: number): void {
@@ -173,8 +193,8 @@ export class Renderer {
         const node: SpriteNode = { obj, key: s.image, stamp: 0, px: null };
         if (s.image) {
           obj.visible = false;
-          this.track(
-            this.texture(s.image).then((base) => {
+          loadTexture(s.image).then(
+            (base) => {
               const tex = base.clone();
               tex.needsUpdate = true;
               mat.map = tex;
@@ -182,7 +202,8 @@ export class Renderer {
               const img = base.image as { width: number; height: number };
               node.px = { w: img.width, h: img.height };
               obj.visible = true;
-            }),
+            },
+            (err: unknown) => console.error(`Sprite.image: ${String(err)}`),
           );
         }
         n = node;
@@ -306,27 +327,6 @@ export class Renderer {
       this.geometries.set(shape, g);
     }
     return g;
-  }
-
-  private texture(url: string): Promise<THREE.Texture> {
-    let t = this.textures.get(url);
-    if (!t) {
-      t = new THREE.TextureLoader().loadAsync(url).then((tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        // Pixel art friendly; smooth filtering can become a Sprite option when needed.
-        tex.magFilter = THREE.NearestFilter;
-        return tex;
-      });
-      t.catch(() => {});
-      this.textures.set(url, t);
-    }
-    return t;
-  }
-
-  private track(p: Promise<unknown>): void {
-    const tracked = p.catch((err: unknown) => console.error(`Sprite: ${String(err)}`));
-    this.pending.add(tracked);
-    tracked.finally(() => this.pending.delete(tracked));
   }
 
   private sweep<T extends THREE.Object3D>(nodes: Map<Entity, Node<T>>): void {

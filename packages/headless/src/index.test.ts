@@ -45,7 +45,7 @@ describe('headless', () => {
     }
     assertComponent(w, 'Player', Health, { value: 80 });
     expect(dumpEntity(w, find(w, 'Player'))).toBe(
-      '#6 Player Transform2D{position:(3,1.5) rotation:0 scale:(1,1)} Health{value:80}',
+      '#6 Player Transform2D{position:(3,1.5)} Health{value:80}',
     );
   });
 
@@ -71,7 +71,7 @@ describe('headless', () => {
     const e = w.spawn();
     w.add(e, Transform2D);
     expect(() => assertComponent(w, e, Transform2D, { position: { x: 1 } })).toThrow(
-      'Transform2D.position.x expected 1 | #1 Transform2D{position:(0,0) rotation:0 scale:(1,1)}',
+      'Transform2D.position.x expected 1 | #1 Transform2D{}',
     );
     expect(() => assertComponent(w, e, Health, { value: 1 })).toThrow('has no Health');
     expect(() => assertComponent(w, e, Transform2D, { position: 3 as never })).toThrow(

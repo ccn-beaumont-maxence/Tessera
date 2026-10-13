@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { launch, main, pageUrl, serve } from './main';
+import { launch, loadGame, main, pageUrl, serve } from './main';
 
 const example = (name: string) =>
   resolve(import.meta.dirname, '../../../examples', name, 'main.ts');
@@ -56,6 +56,74 @@ describe('tess dev page', () => {
     } finally {
       await browser.close();
       await server.close();
+    }
+  });
+});
+
+describe('YAML scenes', () => {
+  const sceneFile = resolve(import.meta.dirname, '../../../examples/scene-2d/scene.yaml');
+
+  it('plays headless without wiring code', async () => {
+    const { World } = await import('@tessera/core');
+    const { press, runFrames, find } = {
+      ...(await import('@tessera/input')),
+      ...(await import('@tessera/headless')),
+    };
+    const w = new World();
+    await (await loadGame(sceneFile)).setup(w);
+    press(w, 'move');
+    runFrames(w, 120);
+    const { Score } = await import('../../../examples/scene-2d/game');
+    expect(w.resource(Score).value).toBe(2);
+    expect(() => find(w, 'Player')).not.toThrow();
+  });
+
+  it('applies YAML edits without reloading the page', { timeout: 60_000 }, async () => {
+    const dir = resolve(import.meta.dirname, '../.tmp/hmr');
+    rmSync(dir, { recursive: true, force: true });
+    cpSync(resolve(sceneFile, '..'), dir, { recursive: true });
+    const file = join(dir, 'scene.yaml');
+    const server = await serve(dir);
+    const browser = await launch();
+    try {
+      const page = await browser.newPage();
+      await page.goto(pageUrl(server, file));
+      await page.waitForFunction(() => (globalThis as { __tess?: string }).__tess === 'done');
+      await page.evaluate(() => {
+        (globalThis as { marker?: number }).marker = 1;
+      });
+      writeFileSync(
+        file,
+        readFileSync(file, 'utf8').replace('position: [2, 2] }', 'position: [2, 3.5] }'),
+      );
+      await page.waitForFunction(
+        () => {
+          const g = globalThis as unknown as {
+            tess: {
+              world: {
+                entities(): Iterable<number>;
+                nameOf(e: number): string;
+                components(e: number): [{ name: string }, { position: { y: number } }][];
+              };
+            };
+          };
+          const w = g.tess.world;
+          for (const e of w.entities()) {
+            if (w.nameOf(e) !== 'Ledge') continue;
+            return w
+              .components(e)
+              .some(([t, v]) => t.name === 'Transform2D' && v.position.y === 3.5);
+          }
+          return false;
+        },
+        null,
+        { timeout: 10_000 },
+      );
+      expect(await page.evaluate(() => (globalThis as { marker?: number }).marker)).toBe(1);
+    } finally {
+      await browser.close();
+      await server.close();
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

@@ -1,17 +1,23 @@
-import { existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { type Game, World } from '@tessera/core';
 import { dump, runFrames } from '@tessera/headless';
+import { sceneGame } from '@tessera/scene';
 import { chromium } from 'playwright';
-import { createServer, runnerImport, type ViteDevServer } from 'vite';
+import { createServer, type ViteDevServer } from 'vite';
 
 const USAGE = `usage:
   tess run <entry> [--frames N] [--seed S] [--dump] [--screenshot out.png]
   tess dev <entry|dir> [--port P]`;
 
-export async function main(argv: string[]): Promise<number> {
+/** Imports a module inside the CLI's module graph, so games share engine module instances. */
+export type Importer = (path: string) => Promise<Record<string, unknown>>;
+let importer: Importer = (path) => import(/* @vite-ignore */ path);
+
+export async function main(argv: string[], load?: Importer): Promise<number> {
+  if (load) importer = load;
   const [command, ...rest] = argv;
   try {
     if (command === 'run') return await run(rest);
@@ -62,12 +68,19 @@ function toInt(v: string, name: string): number {
   return n;
 }
 
+const isScene = (path: string) => /\.ya?ml$/.test(path);
+
+/** Loads a game module (`export default { dimension, setup }`) or a YAML scene. */
 export async function loadGame(path: string): Promise<Game> {
-  const { module } = await runnerImport<{ default?: Partial<Game> }>(path, {
-    configFile: false,
-    logLevel: 'error',
-  });
-  const game = module.default;
+  if (!existsSync(path)) throw new Error(`${path}: file not found`);
+  if (isScene(path)) {
+    return sceneGame(path, {
+      read: async (p) => readFileSync(p, 'utf8'),
+      load: importer,
+      url: (p) => relative(process.cwd(), p),
+    });
+  }
+  const game = (await importer(path)).default as Partial<Game> | undefined;
   if (
     !game ||
     typeof game.setup !== 'function' ||
@@ -80,6 +93,7 @@ export async function loadGame(path: string): Promise<Game> {
 
 const PAGE = (
   render: string,
+  scene: string,
 ) => `<!doctype html><html><head><meta charset="utf-8"><title>Tessera</title></head>
 <body style="margin:0;overflow:hidden;background:#1b1d26">
 <canvas id="c" style="width:100vw;height:100vh;display:block"></canvas>
@@ -87,9 +101,13 @@ const PAGE = (
 const q = new URLSearchParams(location.search);
 try {
   const { start } = await import('/@fs${render}');
-  const game = (await import('/@fs' + q.get('entry'))).default;
+  const entry = q.get('entry');
+  const yaml = /.ya?ml$/.test(entry);
+  const scene = yaml ? await import('/@fs${scene}') : null;
+  const game = yaml ? await scene.sceneGame(entry, scene.browserIO) : (await import('/@fs' + entry)).default;
   const frames = q.has('frames') ? Number(q.get('frames')) : undefined;
   window.tess = await start(game, { canvas: document.getElementById('c'), frames, seed: Number(q.get('seed') ?? 1) });
+  if (yaml && frames === undefined) scene.watch(window.tess.world, entry);
   await window.tess.ready;
   window.__tess = 'done';
 } catch (e) { window.__tess = String(e && e.stack || e); console.error(e); }
@@ -97,7 +115,8 @@ try {
 
 /** Vite dev server whose `/__tess?entry=<abs path>[&frames=N][&seed=S]` page runs a game. */
 export async function serve(root: string, port = 0, index?: string): Promise<ViteDevServer> {
-  const html = PAGE(createRequire(import.meta.url).resolve('@tessera/render'));
+  const require = createRequire(import.meta.url);
+  const html = PAGE(require.resolve('@tessera/render'), require.resolve('@tessera/scene'));
   const server = await createServer({
     configFile: false,
     logLevel: 'error',
@@ -106,6 +125,12 @@ export async function serve(root: string, port = 0, index?: string): Promise<Vit
     plugins: [
       {
         name: 'tess-page',
+        // YAML is fetched, not imported: tell the page instead of letting Vite reload it.
+        handleHotUpdate({ file, server: s }) {
+          if (!isScene(file)) return;
+          s.ws.send({ type: 'custom', event: 'tess:yaml', data: { file } });
+          return [];
+        },
         configureServer(s) {
           s.middlewares.use('/__tess', (_req, res) => {
             res.setHeader('content-type', 'text/html');
@@ -164,7 +189,10 @@ export const launch = () =>
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
 
-/** `tess dev <entry|dir>`: serves one game, or an index of every `<dir>/<game>/main.ts`. */
+const entryOf = (dir: string) =>
+  ['scene.yaml', 'main.ts'].map((f) => join(dir, f)).find((f) => existsSync(f));
+
+/** `tess dev <entry|dir>`: serves one game, or an index of `<dir>/<game>/{scene.yaml,main.ts}`. */
 async function dev(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -177,10 +205,11 @@ async function dev(argv: string[]): Promise<number> {
     console.log(`tess dev: ${pageUrl(await serve(dirname(target), port), target)}`);
   } else {
     const links = readdirSync(target)
-      .filter((d) => existsSync(join(target, d, 'main.ts')))
+      .map((d) => [d, entryOf(join(target, d))] as const)
+      .filter(([, entry]) => entry)
       .map(
-        (d) =>
-          `<li><a href="/__tess?entry=${encodeURIComponent(join(target, d, 'main.ts'))}">${d}</a></li>`,
+        ([d, entry]) =>
+          `<li><a href="/__tess?entry=${encodeURIComponent(entry ?? '')}">${d}</a></li>`,
       )
       .join('');
     const index = `<!doctype html><meta charset="utf-8"><title>Tessera</title><ul>${links}</ul>`;

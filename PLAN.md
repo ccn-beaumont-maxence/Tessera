@@ -68,10 +68,10 @@ Acceptation : tests headless de chute, de collision et de raycast, en 2D
 et en 3D, déterministes.
 
 ## Phase 5 : Entrées, audio, assets, scènes
-- [ ] Entrées par actions nommées (`jump`, `move`) définies en YAML
-- [ ] Audio : sons ponctuels, musique, volume par bus
-- [ ] Assets : glTF, textures, spritesheets, sons, avec cache
-- [ ] Scènes et prefabs en YAML, rechargement à chaud via Vite
+- [x] Entrées par actions nommées (`jump`, `move`) définies en YAML
+- [x] Audio : sons ponctuels, musique, volume par bus
+- [x] Assets : glTF, textures, spritesheets, sons, avec cache
+- [x] Scènes et prefabs en YAML, rechargement à chaud via Vite
 Acceptation : une scène complète est définie sans une ligne de code de
 câblage, et modifier le YAML met le jeu à jour sans recharger la page.
 

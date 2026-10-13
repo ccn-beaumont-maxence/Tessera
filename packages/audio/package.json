@@ -1,0 +1,14 @@
+{
+  "name": "@tessera/audio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --root ../.. packages/audio/"
+  },
+  "dependencies": {
+    "@tessera/assets": "workspace:*",
+    "@tessera/core": "workspace:*"
+  }
+}
