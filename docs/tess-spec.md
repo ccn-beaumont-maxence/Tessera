@@ -2,7 +2,7 @@
 
 Tess is C++-flavored gameplay code compiled to TypeScript for the Tessera engine. A `.tess` file
 declares components, resources, events and systems; a YAML scene lists it in `scripts:` and
-orders its systems. Entities and assets live in YAML, logic lives in Tess.
+orders its systems. Code can be split across files with `using`. Entities and assets live in YAML, logic lives in Tess.
 
 ## Declarations
 
@@ -17,6 +17,17 @@ event Hit { Entity target; float damage = 1; }
 
 Fields default to `0`, `false`, `""`, zero vectors, identity `quat`, white `color`, `none`.
 Field order is kept (state dumps show non-default fields).
+
+## Files
+
+```cpp
+using "./enemy.tess";   // path relative to this file
+```
+
+`using` makes another file's constants, components, resources, events and functions visible
+here (not the files it uses in turn). The scene lists only the entry file in `scripts:`; used
+files load with it and their systems can be listed in `systems:`. A name defined in two files
+is an error. Two files cannot use each other: move what they share to a third file.
 
 ## Types
 
@@ -88,7 +99,7 @@ Conventions: Y up, meters, radians, 3D forward is -Z.
 
 | Written | Use instead |
 | --- | --- |
-| `#include`, headers | list every `.tess` file in the scene's `scripts:` |
+| `#include`, headers, `using namespace` | `using "./other.tess";` |
 | `a->b`, `T*`, `&x` | `a.b`; `T&` only on component/resource parameters; `Entity` to refer to entities |
 | `std::` | built-ins (`std::min` → `min`, `std::cout` → `log`) |
 | `new`, `delete`, `nullptr` | `spawn`, `destroy`, `none` |

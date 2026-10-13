@@ -20,7 +20,7 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 beforeAll(async () => {
   rmSync(dir, { recursive: true, force: true });
   cpSync(resolve(import.meta.dirname, '../../../examples/platformer'), dir, { recursive: true });
-  const game = join(dir, 'game.tess');
+  const game = join(dir, 'enemy.tess');
   writeFileSync(game, readFileSync(game, 'utf8').replace('en.dir = -1;', 'en.dir = 1;'));
   tess = await createTessServer(join(dir, 'scene.yaml'));
   const [a, b] = InMemoryTransport.createLinkedPair();

@@ -210,3 +210,62 @@ system Crash(Entity e, Coin c) {
     expect(Transform3D.name).toBe('Transform3D');
   });
 });
+
+describe('using', () => {
+  const files: Record<string, string> = {
+    'lib.tess':
+      'const float K = 2;\ncomponent Hp { float v = 10; }\nevent Hit { Entity t; }\nfloat twice(float x) { return x * K; }',
+    'a.tess': 'using "./b.tess";',
+    'b.tess': 'using "./game.tess";',
+    'dup.tess': 'component Hp { float v; }',
+  };
+  const read = (f: string) => {
+    const src = files[f];
+    if (src === undefined) throw new Error('ENOENT');
+    return src;
+  };
+  const err = (src: string) => {
+    try {
+      compile(src, 'game.tess', read);
+    } catch (e) {
+      return (e as Error).message;
+    }
+    return 'compiled';
+  };
+
+  it.each([
+    ['using "./lib.tess";\nsystem S(Hp& h) { h.v = twice(h.v) + K; }', 'compiled'],
+    ['using "./nope.tess";', 'game.tess:1:1: cannot read nope.tess'],
+    ['using "./lib.ts";', '`using` takes a .tess file'],
+    ['using "./a.tess";', 'circular using: game.tess -> a.tess -> b.tess -> game.tess'],
+    ['using "./game.tess";', 'a file cannot use itself'],
+    [
+      'using "./lib.tess";\nusing "./dup.tess";',
+      '"Hp" is defined in both ./lib.tess and ./dup.tess',
+    ],
+    ['using "./lib.tess";\ncomponent Hp { float v; }', '"Hp" is already defined in ./lib.tess'],
+    ['using namespace std;', 'Tess `using` takes a file: using "./other.tess";'],
+  ])('%s', (src, msg) => {
+    expect(err(src)).toContain(msg);
+  });
+
+  it('shares components, events, functions and constants across files', async () => {
+    writeFileSync(
+      join(dir, 'shared.tess'),
+      'const float K = 3;\ncomponent Hp { float v = 10; }\nevent Hit { Entity t; float dmg = 1; }\nfloat hurt(float v, float d) { return v - d * K; }\n',
+    );
+    const m = await load(`
+using "./shared.tess";
+system Fire(Entity e, Hp h) { emit(Hit { t = e, dmg = 2 }); }
+system Apply(Hp& h) { for (Hit x : events<Hit>()) h.v = hurt(h.v, x.dmg); }
+`);
+    expect(m.Hp, 'used declarations are re-exported for the scene').toBeDefined();
+    const w = new World();
+    w.add(w.spawn(), comp(m, 'Hp'));
+    w.addSystem(sys(m, 'Fire'));
+    w.addSystem(sys(m, 'Apply'));
+    w.step();
+    w.step();
+    expect(w.components(1).find(([t]) => t.name === 'Hp')?.[1]).toEqual({ v: 4 });
+  });
+});

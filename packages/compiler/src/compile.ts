@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, normalize } from 'node:path';
 import type { Decl, Expr, Stmt, TypeRef } from './ast';
 import { ENGINE, SCALARS, type StructInfo, TS_TYPE, VALUE } from './engine';
 import { type Pos, TessError } from './lexer';
@@ -61,22 +63,37 @@ const isNum = (ty: string) => ty === 'float' || ty === 'int';
 const MATH1 = ['abs', 'floor', 'ceil', 'round', 'sqrt', 'sin', 'cos', 'tan'];
 const MATH2 = ['pow', 'atan2', 'min', 'max'];
 
+/** Reads a `using` target; paths are relative to the current directory like `file`. */
+export type ReadFile = (file: string) => string;
+
 /** Compiles one .tess file to a TypeScript module plus a source map back to the .tess file. */
-export function compile(src: string, file: string): CompileResult {
-  return new Compiler(file).run(src);
+export function compile(
+  src: string,
+  file: string,
+  read: ReadFile = (f) => readFileSync(f, 'utf8'),
+): CompileResult {
+  return new Compiler(file, read).run(src);
 }
+
+const usings = (decls: Decl[]) =>
+  decls.filter((d): d is Extract<Decl, { kind: 'using' }> => d.kind === 'using');
 
 class Compiler {
   private readonly structs = new Map<string, StructInfo>();
   private readonly consts = new Map<string, Var>();
   private readonly fns = new Map<string, Fn>();
   private readonly imports = new Map<string, Set<string>>();
+  /** Names brought in by `using`, to the path they come from. */
+  private readonly used = new Map<string, string>();
   private readonly scratch: string[] = [];
   private readonly out: Line[] = [];
   /** Compiling defaults/constants: value results must be fresh objects, not shared scratch. */
   private constCtx = false;
 
-  constructor(private readonly file: string) {}
+  constructor(
+    private readonly file: string,
+    private readonly read: ReadFile,
+  ) {}
 
   private fail(msg: string, at: Pos): never {
     throw new TessError(this.file, { line: at.line, col: at.col }, msg);
@@ -94,11 +111,14 @@ class Compiler {
 
   run(src: string): CompileResult {
     const decls = parse(src, this.file);
+    for (const u of usings(decls)) this.using(u);
     this.declare(decls);
     for (const d of decls) this.decl(d);
     const head: string[] = [];
     for (const [module, names] of this.imports)
       head.push(`import { ${[...names].sort().join(', ')} } from '${module}';`);
+    // Re-export so a scene only lists its entry script: used components and systems register too.
+    for (const u of usings(decls)) head.push(`export * from '${u.path}';`);
     head.push(`const $file = ${JSON.stringify(this.file)};`, 'let $l = 0;', ...this.scratch);
     const lines: Line[] = [...head.map((text) => ({ text, pos: null })), ...this.out];
     const code = `${lines.map((l) => l.text).join('\n')}\n`;
@@ -112,10 +132,70 @@ class Compiler {
     };
   }
 
+  private parseFile(file: string, at: Pos): Decl[] {
+    let src: string;
+    try {
+      src = this.read(file);
+    } catch {
+      return this.fail(`cannot read ${file}`, at);
+    }
+    return parse(src, file);
+  }
+
+  /** `using "./x.tess";`: x's declarations become visible here and are imported from its module. */
+  private using(u: Extract<Decl, { kind: 'using' }>): void {
+    const file = normalize(join(dirname(this.file), u.path));
+    if (file === this.file) this.fail(`a file cannot use itself`, u);
+    const decls = this.parseFile(file, u);
+    this.noCycle(file, decls, [this.file, file], u);
+    for (const d of decls) {
+      if (d.kind === 'using' || d.kind === 'system') continue;
+      const prev = this.used.get(d.name);
+      if (prev) this.fail(`"${d.name}" is defined in both ${prev} and ${u.path}`, u);
+      this.used.set(d.name, u.path);
+      this.use(u.path, d.name);
+      if (d.kind === 'const') {
+        this.consts.set(d.name, {
+          name: d.name,
+          ty: d.type.name,
+          js: d.name,
+          writable: false,
+          hint: 'constants are read-only',
+        });
+      } else if (d.kind === 'function') {
+        this.fns.set(d.name, {
+          ret: d.ret.name,
+          params: d.params.map((p) => ({ ty: p.type.name, name: p.name, ref: p.type.ref })),
+        });
+      } else {
+        const fields = new Map(d.fields.map((f) => [f.name, f.type.name]));
+        this.structs.set(d.name, { kind: d.kind, fields, module: u.path });
+        if (d.kind === 'event') this.use(u.path, `$new${d.name}`);
+      }
+    }
+  }
+
+  /** Modules that use each other would read uninitialized components at load time. */
+  private noCycle(file: string, decls: Decl[], chain: string[], at: Pos): void {
+    for (const u of usings(decls)) {
+      const next = normalize(join(dirname(file), u.path));
+      if (next === this.file)
+        this.fail(
+          `circular using: ${[...chain, next].join(' -> ')}: move shared declarations to a third file`,
+          at,
+        );
+      if (chain.includes(next)) continue;
+      this.noCycle(next, this.parseFile(next, at), [...chain, next], at);
+    }
+  }
+
   /** First pass: names of structs and functions, so order of declaration does not matter. */
   private declare(decls: Decl[]): void {
     this.use('@tessera/compiler/runtime', '$at');
     for (const d of decls) {
+      if (d.kind === 'using') continue;
+      const from = this.used.get(d.name);
+      if (from) this.fail(`"${d.name}" is already defined in ${from}`, d);
       if (this.structs.has(d.name) || this.fns.has(d.name) || ENGINE[d.name]) {
         this.fail(`"${d.name}" is already defined`, d);
       }
@@ -168,6 +248,8 @@ class Compiler {
         return this.systemDecl(d);
       case 'function':
         return this.functionDecl(d);
+      case 'using':
+        return;
       default:
         return this.structDecl(d);
     }
@@ -195,7 +277,7 @@ class Compiler {
     this.expectType(v, d.type.name, d.value);
     const js = isValue(d.type.name) ? this.freshValue(v, b) : v.js;
     this.constCtx = false;
-    this.out.push({ text: `const ${d.name} = ${this.once(js, b)};`, pos: d });
+    this.out.push({ text: `export const ${d.name} = ${this.once(js, b)};`, pos: d });
     this.consts.set(d.name, {
       name: d.name,
       ty: d.type.name,
@@ -223,7 +305,7 @@ class Compiler {
         text: `export const ${d.name} = ${this.use('@tessera/core', 'event')}(${JSON.stringify(d.name)});`,
         pos: d,
       });
-      this.out.push({ text: `const $new${d.name} = ${create};`, pos: d });
+      this.out.push({ text: `export const $new${d.name} = ${create};`, pos: d });
     } else {
       this.out.push({
         text: `export const ${d.name} = ${this.use('@tessera/core', d.kind)}(${JSON.stringify(d.name)}, ${create});`,
@@ -342,7 +424,7 @@ class Compiler {
         ? [`  let ${Array.from({ length: b.temps }, (_, i) => `$h${i + 1}`).join(', ')};`]
         : [];
     this.out.push({
-      text: `function ${d.name}(${params.join(', ')}): ${this.tsType(d.ret.name)} {`,
+      text: `export function ${d.name}(${params.join(', ')}): ${this.tsType(d.ret.name)} {`,
       pos: d,
     });
     for (const t of temps) this.out.push({ text: t, pos: d });
@@ -1113,7 +1195,7 @@ class Compiler {
           this.fail('emit takes one event literal: emit(Hit { target = e })', e);
         const info = this.structs.get(lit.name);
         if (info?.kind !== 'event')
-          this.fail(`"${lit.name}" is not an event declared in this file`, lit);
+          this.fail(`"${lit.name}" is not an event: declare it with \`event\``, lit);
         b.writes.add(lit.name);
         return {
           ty: 'void',

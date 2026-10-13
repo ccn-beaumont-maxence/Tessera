@@ -1,7 +1,8 @@
+using "./enemy.tess";
+
 const float FALL_LIMIT = -10;
 
 component Player { float speed = 6; float jump = 11; vec2 spawn; bool grounded; }
-component Enemy { float speed = 2; float range = 2; int dir = 1; float startX; bool ready; }
 component Coin { int value = 1; }
 component Goal {}
 component Follow { float minY = 2.5; }
@@ -22,16 +23,6 @@ system PlayerMove(Entity e, RigidBody& body, Player& p, Transform2D t, Sprite& s
     if (x != 0) sprite.flipX = x < 0;
     if (p.grounded && pressed("jump")) body.velocity.y = p.jump;
     if (t.position.y < FALL_LIMIT) respawn(e, score);
-}
-
-system EnemyPatrol(RigidBody& body, Enemy& en, Transform2D t) {
-    if (!en.ready) {
-        en.startX = t.position.x;
-        en.ready = true;
-    }
-    if (t.position.x > en.startX + en.range) en.dir = -1;
-    if (t.position.x < en.startX - en.range) en.dir = 1;
-    body.velocity.x = en.dir * en.speed;
 }
 
 system Contacts(Entity e, Player p, Transform2D t, RigidBody& body, Score& score) {
