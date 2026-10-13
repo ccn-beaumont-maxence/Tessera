@@ -17,7 +17,7 @@ const VALUE_TYPES = [
 
 /** C++ habits mapped to their Tess equivalent (spec: "Not in Tess"). */
 const CPP: Record<string, string> = {
-  '#': 'Tess has no #include or preprocessor: list every .tess file in the scene `scripts:`',
+  '#': 'Tess has no #include or preprocessor: use `using "./other.tess";`',
   '->': 'Tess has no pointers: use `.` (a.b)',
   '::': 'Tess has no `::`: use `.`',
   std: 'Tess has no std::: use built-ins (std::min -> min, std::cout -> log, std::vector -> not needed, use queries)',
@@ -28,7 +28,7 @@ const CPP: Record<string, string> = {
   class: 'Tess has no classes: use `component`, `resource` or `event`',
   struct: 'Tess has no structs: use `component`, `resource` or `event`',
   namespace: 'Tess has no namespaces: names are global to the scene',
-  using: 'Tess has no `using`: names are global to the scene',
+  using: 'Tess `using` takes a file: using "./other.tess";',
   template: 'Tess has no templates',
   typedef: 'Tess has no typedef',
   unsigned: 'Tess has no unsigned: use int',
@@ -95,9 +95,17 @@ class Parser {
   }
 
   private decl(): Decl {
-    this.cpp();
+    if (this.tok.text !== 'using') this.cpp();
     const t = this.tok;
     const at = { line: t.line, col: t.col };
+    if (t.text === 'using' && this.peek().kind === 'string') {
+      this.i++;
+      const path = this.tok.text.slice(1, -1);
+      if (!path.endsWith('.tess')) this.fail('`using` takes a .tess file: using "./other.tess";');
+      this.i++;
+      this.expect(';');
+      return { kind: 'using', path, ...at };
+    }
     if (this.eat('const')) {
       const type = this.type();
       const name = this.ident().text;
@@ -130,7 +138,7 @@ class Parser {
     const ret = this.type();
     const name = this.ident('a function name').text;
     if (!this.is('('))
-      this.fail('top level allows const, component, resource, event, system and functions');
+      this.fail('top level allows using, const, component, resource, event, system and functions');
     const params = this.params();
     return { kind: 'function', name, ret, params, body: this.block(), ...at };
   }

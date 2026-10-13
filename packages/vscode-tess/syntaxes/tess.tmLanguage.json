@@ -23,6 +23,7 @@
             "2": { "name": "entity.name.type.tess" }
           }
         },
+        { "name": "keyword.control.import.tess", "match": "\\busing\\b" },
         {
           "match": "\\b(const)\\b",
           "name": "storage.modifier.tess"

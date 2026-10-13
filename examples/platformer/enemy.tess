@@ -1,0 +1,12 @@
+// Patrols around its start position; game.tess handles stomps.
+component Enemy { float speed = 2; float range = 2; int dir = 1; float startX; bool ready; }
+
+system EnemyPatrol(RigidBody& body, Enemy& en, Transform2D t) {
+    if (!en.ready) {
+        en.startX = t.position.x;
+        en.ready = true;
+    }
+    if (t.position.x > en.startX + en.range) en.dir = -1;
+    if (t.position.x < en.startX - en.range) en.dir = 1;
+    body.velocity.x = en.dir * en.speed;
+}

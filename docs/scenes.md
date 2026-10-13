@@ -4,7 +4,7 @@ A scene is one YAML file: entities and assets live here, logic lives in the scri
 
 ```yaml
 dimension: 2d                 # or 3d: picks the default camera and the physics backend
-scripts: [./game.tess]        # .tess or .ts modules; their components/resources/systems become usable by name
+scripts: [./game.tess]        # .tess or .ts modules (plus the files they `using`); their components/resources/systems become usable by name
 systems: [PlayerMove, Score]  # run order of script systems
 input:                        # named actions (or a path: ./input.yaml)
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW], down: [KeyS], stick: PadLeft }

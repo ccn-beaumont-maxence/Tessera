@@ -17,6 +17,7 @@ export interface Param extends Pos {
 }
 
 export type Decl =
+  | ({ kind: 'using'; path: string } & Pos)
   | ({ kind: 'const'; name: string; type: TypeRef; value: Expr } & Pos)
   | ({ kind: 'component' | 'resource' | 'event'; name: string; fields: Field[] } & Pos)
   | ({ kind: 'system'; name: string; params: Param[]; body: Stmt[] } & Pos)

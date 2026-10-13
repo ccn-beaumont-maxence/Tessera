@@ -8,7 +8,8 @@ TypeScript) ou en TypeScript. Objectif : peu de tokens par jeu, réussite au pre
 
 1. Lire `docs/tess-spec.md` (langage) et `docs/scenes.md` (format des scènes) avant d'écrire.
 2. Partir d'un exemple : `examples/platformer` (2D) ou `examples/arena` (3D), chacun
-   `scene.yaml` + `game.tess`.
+   `scene.yaml` + `game.tess`. Découper par fonctionnalité avec `using "./enemy.tess";`
+   (voir `examples/platformer/enemy.tess`).
 3. Vérifier sans navigateur, à chaque modification :
    - `pnpm exec tess run <scene.yaml> --frames 120 --dump` : état final, une ligne par entité ;
    - `pnpm exec tess run <scene.yaml> --frames 120 --screenshot out.png` : image à regarder ;
