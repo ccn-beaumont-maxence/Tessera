@@ -61,6 +61,7 @@ describe('headless', () => {
     expect(formatValue('a')).toBe('"a"');
     expect(formatValue([1, { x: 1, y: 2, z: 3, w: 4 }])).toBe('[1,(1,2,3,4)]');
     expect(formatValue({ y: 1, x: 2 })).toBe('{y:1 x:2}');
+    expect(formatValue({ r: 1, g: 0.5, b: 0, a: 1 })).toBe('(1,0.5,0,1)');
     expect(formatValue(true)).toBe('true');
     expect(formatValue(null)).toBe('null');
   });

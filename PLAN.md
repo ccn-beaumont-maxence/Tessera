@@ -53,10 +53,10 @@ Acceptation : un test simule 300 frames et vérifie un état final, deux
 exécutions avec la même graine produisent un dump identique.
 
 ## Phase 3 : Rendu
-- [ ] Synchronisation ECS vers le graphe de scène three.js
-- [ ] 3D : Mesh, Camera3D, lumières, matériaux de base
-- [ ] 2D : Sprite, Camera2D, calques, animations de spritesheet
-- [ ] Capture d'écran à une frame donnée via Playwright
+- [x] Synchronisation ECS vers le graphe de scène three.js
+- [x] 3D : Mesh, Camera3D, lumières, matériaux de base
+- [x] 2D : Sprite, Camera2D, calques, animations de spritesheet
+- [x] Capture d'écran à une frame donnée via Playwright
 Acceptation : un exemple 2D et un exemple 3D s'affichent, et
 `tess run <scene> --frames 120 --screenshot out.png` produit une image.
 

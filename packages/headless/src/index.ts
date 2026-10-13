@@ -5,7 +5,7 @@ export function runFrames(world: World, n: number): void {
   for (let i = 0; i < n; i++) world.step();
 }
 
-/** Compact value formatting: vectors as `(x,y[,z[,w]])`, numbers rounded to 3 decimals. */
+/** Compact value formatting: vectors and colors as tuples `(x,y[,z[,w]])`, numbers rounded to 3 decimals. */
 export function formatValue(v: unknown): string {
   if (typeof v === 'number') {
     const r = Math.round(v * 1000) / 1000;
@@ -22,9 +22,10 @@ export function formatValue(v: unknown): string {
   return String(v);
 }
 
-const VECTOR_KEYS = ['x', 'y', 'z', 'w'];
 const isVector = (keys: string[]) =>
-  keys.length >= 2 && keys.length <= 4 && keys.every((k, i) => k === VECTOR_KEYS[i]);
+  keys.length >= 2 &&
+  keys.length <= 4 &&
+  (keys.every((k, i) => k === 'xyzw'[i]) || (keys.length === 4 && keys.join('') === 'rgba'));
 
 /** One line: `#12 Player Transform2D{position:(3,1.5) rotation:0 scale:(1,1)} Health{value:80}`. */
 export function dumpEntity(world: World, e: Entity): string {
