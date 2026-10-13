@@ -18,7 +18,7 @@ void respawn(Entity e, Score& score) {
 }
 
 system PlayerMove(Entity e, RigidBody& body, Player& p, Transform2D t, Sprite& sprite, Score& score) {
-    p.grounded = raycast(t.position, vec2(0, -1), 0.6, e) != none;
+    p.grounded = raycast(t.position, vec2(0, -1), 0.6, e).entity != none;
     float x = axis("move").x;
     body.velocity.x = x * p.speed;
     if (x != 0) sprite.flipX = x < 0;

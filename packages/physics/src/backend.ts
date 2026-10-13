@@ -1,10 +1,18 @@
-import type { Entity, Vec3, World } from '@tessera/core';
+import type { Entity, Vec2, Vec3, World } from '@tessera/core';
 import { Collider, Collision, RigidBody, type Shape } from './components';
 
 export interface RayHit {
   entity: Entity;
   point: Vec3;
   normal: Vec3;
+  distance: number;
+}
+
+/** RayHit as seen by 2D code (z is 0). */
+export interface RayHit2D {
+  entity: Entity;
+  point: Vec2;
+  normal: Vec2;
   distance: number;
 }
 

@@ -2,7 +2,7 @@ import { type Entity, resource, type Vec3, vec3, type World } from '@tessera/cor
 import type { Backend, Point, RayHit, RayOptions } from './backend';
 import type { Shape } from './components';
 
-export type { Point, RayHit, RayOptions } from './backend';
+export type { Point, RayHit, RayHit2D, RayOptions } from './backend';
 export * from './components';
 
 type AnyBackend = Backend<{ handle: number }, { handle: number }>;

@@ -8,8 +8,10 @@ import {
   Transform2D,
   Transform3D,
   vec2,
+  vec3,
   World,
 } from '@tessera/core';
+import { addPhysics, Collider } from '@tessera/physics';
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from './index';
 
@@ -225,6 +227,33 @@ system Q(Tint t, Out& o) {
     expect(out.r).toBeCloseTo(8);
     expect(out.count).toBe(22);
     expect(out.l).toBeCloseTo(2);
+  });
+
+  it('reads raycast hits and loops over overlaps', async () => {
+    const m = await load(`
+resource Probe { vec2 point; vec2 normal; float distance; Entity hit; int near; }
+system Look(Probe& p) {
+    RayHit2D h = raycast(vec2(0, 5), vec2(0, -1), 20);
+    p.point = h.point;
+    p.normal = h.normal;
+    p.distance = h.distance;
+    p.hit = h.entity;
+    if (raycast(vec2(0, 5), vec2(0, 1), 20).entity == none) p.near = -1;
+    for (Entity o : overlap("sphere", vec2(1, 1), vec2(0, 0))) if (o == p.hit) p.near += 10;
+}
+`);
+    const w = new World();
+    const ground = w.spawn();
+    w.add(ground, Transform2D);
+    w.add(ground, Collider, { size: vec3(4, 1, 1) });
+    await addPhysics(w, { dimension: '2d' });
+    w.addSystem(sys(m, 'Look'));
+    w.step();
+    w.step();
+    const p = w.resourceList().find(([t]) => t.name === 'Probe')?.[1] as Record<string, unknown>;
+    expect(p).toMatchObject({ point: { x: 0, y: 0.5 }, normal: { x: 0, y: 1 }, hit: ground });
+    expect(p.distance).toBeCloseTo(4.5);
+    expect(p.near).toBe(9);
   });
 
   it('emits events, spawns nothing without a scene, and reports runtime errors at the .tess line', async () => {

@@ -151,7 +151,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] `mouse()` en coordonnées monde (2D), `mouseRay()` (3D)
 
 ## Phase 15 : Raycast riche
-- [ ] `raycast` renvoie `RayHit {entity, point, normal, distance}`, `overlap` en Tess
+- [x] `raycast` renvoie `RayHit {entity, point, normal, distance}`, `overlap` en Tess
 
 ## Phase 16 : Tilemap 2D
 - [ ] Composant `Tilemap`, un seul mesh, colliders fusionnés

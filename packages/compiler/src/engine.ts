@@ -88,6 +88,18 @@ export const ENGINE: Record<string, StructInfo> = {
   Light: s('component', '@tessera/render', { kind: 'string', color: 'color', intensity: 'float' }),
   Camera2D: s('component', '@tessera/render', { height: 'float' }),
   Camera3D: s('component', '@tessera/render', { fov: 'float', near: 'float', far: 'float' }),
+  RayHit: s('struct', '@tessera/physics', {
+    entity: 'Entity',
+    point: 'vec3',
+    normal: 'vec3',
+    distance: 'float',
+  }),
+  RayHit2D: s('struct', '@tessera/physics', {
+    entity: 'Entity',
+    point: 'vec2',
+    normal: 'vec2',
+    distance: 'float',
+  }),
   Ray: s('struct', '@tessera/render', { origin: 'vec3', dir: 'vec3' }),
 };
 

@@ -514,6 +514,8 @@ class Compiler {
         return this.query(s, b);
       case 'events':
         return this.events(s, b);
+      case 'list':
+        return this.list(s, b);
       case 'break':
       case 'continue':
         if (b.loops === 0) {
@@ -664,6 +666,41 @@ class Compiler {
     );
     b.loops++;
     this.emit(b, `$h${n} = $w.events(${s.event});`, s);
+    this.emit(b, `for (let $i${n} = 0; $i${n} < $h${n}.length; $i${n}++) {`, s);
+    b.indent++;
+    b.lines.push({ text: `${'  '.repeat(b.indent)}const ${s.var.name} = $h${n}[$i${n}];`, pos: s });
+    for (const st of s.body) this.stmt(st, b);
+    b.indent--;
+    b.lines.push({ text: `${'  '.repeat(b.indent)}}`, pos: null });
+    b.loops--;
+    b.scopes.pop();
+  }
+
+  /** `for (Entity o : overlap(shape, size, position))`. */
+  private list(s: Extract<Stmt, { kind: 'list' }>, b: Body): void {
+    const src = s.source;
+    if (src.kind !== 'call' || src.name !== 'overlap')
+      this.fail('range-for works on `query`, `events<Event>()` or `overlap(...)`', src);
+    if (s.var.type.name !== 'Entity' || s.var.type.ref)
+      this.fail(`loop variable must be "Entity ${s.var.name}"`, s.var);
+    this.needsWorld(src, b, 'overlap');
+    const [shape, size, pos] = this.args(src, b, ['string', 'any', 'any']) as [R, R, R];
+    this.vectorArg(size, src);
+    this.vectorArg(pos, src);
+    const n = b.temps + 1;
+    b.temps++;
+    b.scopes.push(new Map());
+    this.declareVar(
+      b,
+      { name: s.var.name, ty: 'Entity', js: s.var.name, writable: false, hint: '' },
+      s.var,
+    );
+    b.loops++;
+    this.emit(
+      b,
+      `$h${n} = ${this.use('@tessera/physics', 'overlap')}($w, ${shape.js}, ${this.obj(size)}, ${this.obj(pos)});`,
+      s,
+    );
     this.emit(b, `for (let $i${n} = 0; $i${n} < $h${n}.length; $i${n}++) {`, s);
     b.indent++;
     b.lines.push({ text: `${'  '.repeat(b.indent)}const ${s.var.name} = $h${n}[$i${n}];`, pos: s });
@@ -941,7 +978,10 @@ class Compiler {
         l.ty === r.ty ||
         (isNum(l.ty) && isNum(r.ty)) ||
         [l.ty, r.ty].every((t) => t === 'Entity' || t === 'none');
-      if (!ok) this.fail(`cannot compare ${l.ty} with ${r.ty}`, e);
+      if (!ok) {
+        const hit = l.ty.startsWith('RayHit') || r.ty.startsWith('RayHit');
+        this.fail(`cannot compare ${l.ty} with ${r.ty}${hit ? ': compare its .entity' : ''}`, e);
+      }
       return { ty: 'bool', js: `(${l.js} ${op}= ${r.js})` };
     }
     if (['<', '<=', '>', '>='].includes(op)) {
@@ -1209,6 +1249,8 @@ class Compiler {
       }
       case 'events':
         return this.fail('events<T>() is only for range-for: for (Hit h : events<Hit>())', e);
+      case 'overlap':
+        return this.fail('overlap() is only for range-for: for (Entity o : overlap(...))', e);
       case 'down':
       case 'pressed':
       case 'released': {
@@ -1245,9 +1287,12 @@ class Compiler {
         this.vectorArg(o, e);
         this.expectType(d, o.ty, e.args[1] as Expr);
         const opts = ex ? `{ exclude: ${ex.js} }` : '{}';
+        const ty = o.ty === 'vec2' ? 'RayHit2D' : 'RayHit';
+        this.struct(ty);
+        const m = this.repeatable(max.js, b);
         return {
-          ty: 'Entity',
-          js: `(${this.use('@tessera/physics', 'raycast')}($w, ${this.obj(o)}, ${this.obj(d)}, ${max.js}, ${opts})?.entity ?? 0)`,
+          ty,
+          js: `(${this.use('@tessera/physics', 'raycast')}($w, ${this.obj(o)}, ${this.obj(d)}, ${m.first}, ${opts}) ?? ${this.use('@tessera/compiler/runtime', '$noHit')}(${m.ref}))`,
         };
       }
       case 'play':
@@ -1321,6 +1366,7 @@ class Compiler {
         'mouse',
         'mouseRay',
         'raycast',
+        'overlap',
         'play',
         'music',
         'loadScene',

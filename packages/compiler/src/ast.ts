@@ -31,6 +31,8 @@ export type Stmt =
   | ({ kind: 'for'; init: Stmt | null; cond: Expr | null; step: Expr | null; body: Stmt[] } & Pos)
   | ({ kind: 'query'; vars: Param[]; body: Stmt[] } & Pos)
   | ({ kind: 'events'; var: Param; event: string; body: Stmt[] } & Pos)
+  /** `for (Entity o : overlap(...))`: a built-in returning entities. */
+  | ({ kind: 'list'; var: Param; source: Expr; body: Stmt[] } & Pos)
   | ({ kind: 'break' | 'continue' } & Pos)
   | ({ kind: 'return'; value: Expr | null } & Pos)
   | ({ kind: 'block'; body: Stmt[] } & Pos);
