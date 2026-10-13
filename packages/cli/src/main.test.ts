@@ -48,11 +48,11 @@ describe('tess dev page', () => {
       const page = await browser.newPage();
       await page.goto(pageUrl(server, entry));
       await page.waitForFunction(() => (globalThis as { __tess?: string }).__tess === 'done');
-      await page.waitForTimeout(500);
-      const frame = await page.evaluate(
-        () => (globalThis as unknown as { tess: { world: { frame: number } } }).tess.world.frame,
+      // Waits for frames rather than a fixed delay: CI renders slowly with a software GPU.
+      await page.waitForFunction(
+        () =>
+          (globalThis as unknown as { tess: { world: { frame: number } } }).tess.world.frame > 10,
       );
-      expect(frame).toBeGreaterThan(10);
     } finally {
       await browser.close();
       await server.close();
