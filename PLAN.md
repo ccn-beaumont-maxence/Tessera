@@ -129,3 +129,7 @@ d'exécution uniquement via le MCP.
       réussite au premier essai
 - [ ] Rapport dans `benchmarks/RESULTS.md`
 Acceptation : résultats reproductibles avec un seul script.
+
+État : `pnpm bench` est prêt (comptage de tokens, 4 tâches × 2 langages, contrôles headless,
+`benchmarks/RESULTS.md`). `pnpm bench --oracle` valide tâches et contrôles hors ligne (8/8).
+L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.

@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.34.7",
   "scripts": {
     "dev": "tess dev examples",
+    "bench": "node benchmarks/bench.js",
     "test": "vitest run",
     "typecheck": "tsc && tsc -p tsconfig.dom.json && tsc -p tsconfig.node.json",
     "lint": "biome check .",

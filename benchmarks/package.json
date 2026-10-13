@@ -1,0 +1,10 @@
+{
+  "name": "@tessera/benchmarks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@tessera/cli": "workspace:*"
+  }
+}

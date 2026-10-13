@@ -9,6 +9,7 @@ export default defineConfig({
       'packages/*/src/**/*.test.ts',
       'packages/vscode-tess/*.test.ts',
       'examples/**/*.test.ts',
+      'benchmarks/*.test.ts',
     ],
     coverage: {
       // Browser and CLI code is covered by Playwright-driven tests, not line coverage.
