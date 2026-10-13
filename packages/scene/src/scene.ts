@@ -8,6 +8,8 @@ import {
   type ResourceType,
   resource,
   type System,
+  Timer,
+  Timers,
   Transform2D,
   Transform3D,
   vec3,
@@ -44,6 +46,7 @@ const BUILTIN_COMPONENTS: Record<string, AnyComponent> = Object.fromEntries(
     Transform2D,
     Transform3D,
     Parent,
+    Timer,
     Mesh,
     Light,
     Camera3D,
@@ -89,7 +92,7 @@ async function registry(parsed: Parsed, io: SceneIO): Promise<Registry> {
   const r: Registry = {
     components: { ...BUILTIN_COMPONENTS },
     resources: {},
-    systems: { SpriteAnimate },
+    systems: { SpriteAnimate, Timers },
   };
   for (const [i, script] of parsed.scripts.entries()) {
     let mod: Record<string, unknown>;
@@ -248,6 +251,7 @@ function instantiate(world: World, { parsed, registry: r }: Prepared): void {
   }
 
   const order = [...parsed.systems];
+  if (!order.includes('Timers')) order.unshift('Timers');
   if (parsed.input && !order.includes('Input')) order.unshift('Input');
   if (usesPhysics(parsed) && !order.includes('Physics')) order.push('Physics');
   if (usesAny(parsed, ['SpriteAnimation']) && !order.includes('SpriteAnimate'))

@@ -46,6 +46,7 @@ to the YAML file. Only the fields you write change; the rest keep the component 
 | Transform2D | position [0,0], rotation 0 (radians), scale [1,1] |
 | Parent | entity (set by `children:`; the transform becomes local to that entity's; physics bodies ignore it, keep them on root entities) |
 | Transform3D | position [0,0,0], rotation identity, scale [1,1,1] |
+| Timer | duration 1, time 0, repeat false, destroy false, done (true on the step it elapses; then stops, or restarts with repeat; destroy removes the entity) |
 | Sprite | image '', size [1,1] (used without image), color white, pixelsPerUnit 100, layer 0 (higher on top), columns 1, rows 1, frame 0, flipX false |
 | Text | text '', size 0.5 (line height), color white, align left/center/right, layer 0, screen false (true: HUD over everything, Transform2D position in [-1,1] with y up, size in tenths of screen height) |
 | SpriteAnimation | frames [0], fps 10, loop true |
@@ -57,5 +58,5 @@ to the YAML file. Only the fields you write change; the rest keep the component 
 | Collider | shape box/sphere/capsule, size [1,1,1] (full extent; sphere/capsule diameter = x), sensor false, friction 0.5, restitution 0, density 1 |
 
 A Collider without RigidBody is fixed. Without a camera entity a default one is used; without
-lights, default lighting. `Input` runs first, `Physics` and `SpriteAnimate` last, unless you list
+lights, default lighting. `Input` then `Timers` run first, `Physics` and `SpriteAnimate` last, unless you list
 them in `systems:`. In `tess dev`, saving the YAML updates the running game without a reload.

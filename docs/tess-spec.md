@@ -74,7 +74,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Area | Built-ins |
 | --- | --- |
 | Time | `dt`, `time`, `frame` |
-| Math | `abs min max clamp floor ceil round sqrt pow sin cos tan atan2 PI`, `lerp(a, b, t)` (floats or vectors) |
+| Math | `abs min max clamp floor ceil round sqrt pow sin cos tan atan2 PI`, `lerp(a, b, t)` (floats or vectors), `ease("out", t)` (linear in out inOut outBack outBounce) |
 | Vectors | `vec2(x, y)`, `vec3(x, y, z)`, `len(v)`, `dist(a, b)`, `dot(a, b)`, `cross(a, b)`, `normalize(v)` |
 | Rotation | `quat(x, y, z, w)`, `euler(x, y, z)` (radians), `axisAngle(axis, angle)` |
 | Color | `color(r, g, b, a = 1)`, `color("#ff8800")` |
@@ -89,7 +89,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Debug | `log(a, b, ...)` |
 
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,
-`Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `RigidBody {type, velocity, angularVelocity,
+`Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `Timer {duration, time, repeat, destroy, done}`, `RigidBody {type, velocity, angularVelocity,
 gravityScale, linearDamping, lockRotation}`, `Collider {shape, size, sensor, friction,
 restitution, density}`, `Sprite`, `SpriteAnimation`, `Text {text, size, color, align, layer, screen}`, `Mesh`, `Light`, `Camera2D`, `Camera3D`.
 Engine event: `Collision {Entity a; Entity b; bool started; bool sensor;}`.

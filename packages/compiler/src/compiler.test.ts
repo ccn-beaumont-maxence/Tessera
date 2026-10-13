@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import {
   type ComponentType,
   type System,
+  Timer,
+  Timers,
   Transform2D,
   Transform3D,
   vec2,
@@ -125,6 +127,21 @@ const comp = (m: Record<string, unknown>, name: string) =>
   m[name] as ComponentType<Record<string, unknown>>;
 
 describe('generated code', () => {
+  it('drives eased motion from a Timer', async () => {
+    const m = await load(`
+system Slide(Transform2D& t, Timer timer) {
+    t.position.x = lerp(0, 10, ease("out", timer.time / timer.duration));
+}
+`);
+    const w = new World();
+    const e = w.spawn();
+    w.add(e, Transform2D);
+    w.add(e, Timer, { duration: 1 });
+    w.addSystem(Timers, sys(m, 'Slide'));
+    for (let i = 0; i < 30; i++) w.step();
+    expect(w.get(e, Transform2D)?.position.x).toBeCloseTo(7.5);
+  });
+
   it('runs vector math without allocating new vectors', async () => {
     const m = await load(`
 component Vel { vec2 v = vec2(3, 4); float k = 2; }

@@ -27,6 +27,13 @@ export const ENGINE: Record<string, StructInfo> = {
     scale: 'vec3',
   }),
   Parent: s('component', '@tessera/core', { entity: 'Entity' }),
+  Timer: s('component', '@tessera/core', {
+    duration: 'float',
+    time: 'float',
+    repeat: 'bool',
+    destroy: 'bool',
+    done: 'bool',
+  }),
   RigidBody: s('component', '@tessera/physics', {
     type: 'string',
     velocity: 'vec3',

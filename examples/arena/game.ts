@@ -20,7 +20,7 @@ export const Player = component('Player', () => ({
   cooldown: 0,
 }));
 export const Enemy = component('Enemy', () => ({ speed: 2.5, hp: 2 }));
-export const Bullet = component('Bullet', () => ({ speed: 16, life: 1.2 }));
+export const Bullet = component('Bullet', () => ({ speed: 16 }));
 export const Hud = component('Hud', () => ({}));
 export const Game = resource('Game', () => ({ lives: 3, kills: 0, over: false }));
 export const Spawner = resource('Spawner', () => ({
@@ -74,11 +74,6 @@ export const Shoot = system(
   },
   { reads: [Game, Enemy] },
 );
-
-export const BulletLife = system('BulletLife', [mut(Bullet)], (w, e, b) => {
-  b.life -= w.dt;
-  if (b.life <= 0) w.destroy(e);
-});
 
 export const EnemyChase = system(
   'EnemyChase',

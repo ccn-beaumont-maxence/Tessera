@@ -1156,6 +1156,10 @@ class Compiler {
           js: a.length === 0 ? '$w.rng.next()' : `$w.rng.range(${a[0]?.js}, ${a[1]?.js})`,
         };
       }
+      case 'ease': {
+        const [k, t] = this.args(e, b, ['string', 'num']) as [R, R];
+        return { ty: 'float', js: `${core('ease')}(${k.js}, ${t.js})` };
+      }
       case 'randomInt': {
         this.needsWorld(e, b, n);
         const [x, y] = this.args(e, b, ['num', 'num']) as [R, R];
@@ -1288,6 +1292,7 @@ class Compiler {
         'normalize',
         'random',
         'randomInt',
+        'ease',
         'spawn',
         'destroy',
         'alive',

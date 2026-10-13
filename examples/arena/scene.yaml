@@ -1,6 +1,6 @@
 dimension: 3d
 scripts: [./game.tess]
-systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits, ShowScore, Restart]
+systems: [PlayerMove, Shoot, EnemyChase, SpawnEnemies, Hits, ShowScore, Restart]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
   fire: [Space, MouseLeft, PadRT]
@@ -19,6 +19,7 @@ prefabs:
     RigidBody: { gravityScale: 0 }
     Collider: { shape: sphere, size: [0.25, 0.25, 0.25], sensor: true }
     Bullet: {}
+    Timer: { duration: 1.2, destroy: true }
   Enemy:
     Transform3D: {}
     Mesh: { shape: capsule, size: [0.8, 1.2, 0.8], color: '#d1495b' }

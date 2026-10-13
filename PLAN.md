@@ -145,7 +145,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] `loadScene("x.yaml", Score)` différé en fin de frame, scènes préchargées via `scenes:`
 
 ## Phase 13 : Timers et tweens
-- [ ] `Timer` + événement `TimerDone`, `Tween` avec easing
+- [x] `Timer` (`done`, `repeat`, `destroy`) et `ease(kind, t)` ; un tween = Timer + ease + lerp
 
 ## Phase 14 : Pointeur dans le monde
 - [ ] `mouse()` en coordonnées monde (2D), `mouseRay()` (3D)
