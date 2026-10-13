@@ -1,7 +1,12 @@
 import { loaded, loadModel, loadTexture } from '@tessera/assets';
 import {
   type Color,
+  compose2D,
+  compose3D,
   type Entity,
+  type Pose2D,
+  type Pose3D,
+  parentOf,
   type Quat,
   quat,
   Transform2D,
@@ -71,7 +76,7 @@ const UNIT: Record<string, () => THREE.BufferGeometry> = {
   cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
 };
 
-const ORIGIN2 = { position: { x: 0, y: 0 }, rotation: 0 };
+const ORIGIN2 = Transform2D.create();
 
 const setColor = (target: THREE.Color, c: Color) =>
   target.setRGB(c.r, c.g, c.b, THREE.SRGBColorSpace);
@@ -94,8 +99,10 @@ export class Renderer {
   private readonly hud = new THREE.Scene();
   private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   private stamp = 0;
-  private readonly p = vec3();
-  private readonly q = quat();
+  private readonly w2 = Transform2D.create();
+  private readonly up2 = Transform2D.create();
+  private readonly w3 = Transform3D.create();
+  private readonly up3 = Transform3D.create();
   private readonly size = new THREE.Vector2();
 
   constructor(
@@ -167,34 +174,65 @@ export class Renderer {
     return s;
   }
 
-  private place3(
-    e: Entity,
-    t: { position: Vec3; rotation: Quat },
-    alpha: number,
-    o: THREE.Object3D,
-  ) {
+  /** `e`'s transform interpolated from the last capture, into `out`. */
+  private local3(e: Entity, t: Pose3D, alpha: number, out: Pose3D): Pose3D {
     const s = alpha < 1 ? this.prev.get(e) : undefined;
-    const p = s ? vec3.lerp(s.p, t.position, alpha, this.p) : t.position;
-    const q = s ? quat.slerp(s.q, t.rotation, alpha, this.q) : t.rotation;
-    o.position.set(p.x, p.y, p.z);
-    o.quaternion.set(q.x, q.y, q.z, q.w);
+    if (s) {
+      vec3.lerp(s.p, t.position, alpha, out.position);
+      quat.slerp(s.q, t.rotation, alpha, out.rotation);
+    } else {
+      vec3.copy(t.position, out.position);
+      quat.copy(t.rotation, out.rotation);
+    }
+    vec3.copy(t.scale, out.scale);
+    return out;
+  }
+
+  private local2(e: Entity, t: Pose2D, alpha: number, out: Pose2D): Pose2D {
+    const s = alpha < 1 ? this.prev.get(e) : undefined;
+    out.position.x = s ? s.p.x + (t.position.x - s.p.x) * alpha : t.position.x;
+    out.position.y = s ? s.p.y + (t.position.y - s.p.y) * alpha : t.position.y;
+    out.rotation = s ? s.a + (t.rotation - s.a) * alpha : t.rotation;
+    out.scale.x = t.scale.x;
+    out.scale.y = t.scale.y;
+    return out;
+  }
+
+  /** Interpolated world pose (Parent chain applied); shared scratch, use before the next call. */
+  private pose3(e: Entity, t: Pose3D, alpha: number): Pose3D {
+    const out = this.local3(e, t, alpha, this.w3);
+    for (let p = parentOf(this.world, e, Transform3D), d = 0; p && d < 64; d++) {
+      const pt = this.world.get(p, Transform3D) as Pose3D;
+      compose3D(this.local3(p, pt, alpha, this.up3), out, out);
+      p = parentOf(this.world, p, Transform3D);
+    }
+    return out;
+  }
+
+  private pose2(e: Entity, t: Pose2D, alpha: number): Pose2D {
+    const out = this.local2(e, t, alpha, this.w2);
+    for (let p = parentOf(this.world, e, Transform2D), d = 0; p && d < 64; d++) {
+      const pt = this.world.get(p, Transform2D) as Pose2D;
+      compose2D(this.local2(p, pt, alpha, this.up2), out, out);
+      p = parentOf(this.world, p, Transform2D);
+    }
+    return out;
+  }
+
+  private place3(e: Entity, t: Pose3D, alpha: number, o: THREE.Object3D): Pose3D {
+    const w = this.pose3(e, t, alpha);
+    o.position.set(w.position.x, w.position.y, w.position.z);
+    o.quaternion.set(w.rotation.x, w.rotation.y, w.rotation.z, w.rotation.w);
+    return w;
   }
 
   /** 2D pose; `layer` sets draw order (and a tiny z so equal layers still sort). */
-  private place2(
-    e: Entity,
-    t: { position: { x: number; y: number }; rotation: number },
-    alpha: number,
-    o: THREE.Object3D,
-    layer: number,
-  ) {
-    const prev = alpha < 1 ? this.prev.get(e) : undefined;
-    const x = prev ? prev.p.x + (t.position.x - prev.p.x) * alpha : t.position.x;
-    const y = prev ? prev.p.y + (t.position.y - prev.p.y) * alpha : t.position.y;
-    const a = prev ? prev.a + (t.rotation - prev.a) * alpha : t.rotation;
-    o.position.set(x, y, layer * 0.01);
-    o.rotation.set(0, 0, a);
+  private place2(e: Entity, t: Pose2D, alpha: number, o: THREE.Object3D, layer: number): Pose2D {
+    const w = this.pose2(e, t, alpha);
+    o.position.set(w.position.x, w.position.y, layer * 0.01);
+    o.rotation.set(0, 0, w.rotation);
     o.renderOrder = layer;
+    return w;
   }
 
   private syncMeshes(alpha: number): void {
@@ -220,8 +258,8 @@ export class Renderer {
         mat.roughness = m.roughness;
         mat.metalness = m.metalness;
       }
-      this.place3(e, t, alpha, n.obj);
-      n.obj.scale.set(t.scale.x * m.size.x, t.scale.y * m.size.y, t.scale.z * m.size.z);
+      const { scale } = this.place3(e, t, alpha, n.obj);
+      n.obj.scale.set(scale.x * m.size.x, scale.y * m.size.y, scale.z * m.size.z);
     });
     this.sweep(this.meshes);
   }
@@ -288,8 +326,8 @@ export class Renderer {
         tex.repeat.set(1 / s.columns, 1 / s.rows);
         tex.offset.set(col / s.columns, 1 - (row + 1) / s.rows);
       }
-      this.place2(e, t, alpha, obj, s.layer);
-      obj.scale.set(w * t.scale.x * (s.flipX ? -1 : 1), h * t.scale.y, 1);
+      const { scale } = this.place2(e, t, alpha, obj, s.layer);
+      obj.scale.set(w * scale.x * (s.flipX ? -1 : 1), h * scale.y, 1);
     });
     this.sweep(this.sprites);
   }
@@ -332,15 +370,14 @@ export class Renderer {
       const t2 = this.world.get(e, Transform2D);
       const t3 = t.screen ? undefined : this.world.get(e, Transform3D);
       if (t3) {
-        this.place3(e, t3, alpha, obj);
-        obj.translateX(shift);
-        obj.scale.set(w * t3.scale.x, h * t3.scale.y, 1);
+        const { scale } = this.place3(e, t3, alpha, obj);
+        obj.translateX(shift * scale.x);
+        obj.scale.set(w * scale.x, h * scale.y, 1);
         return;
       }
-      if (t2) this.place2(e, t2, alpha, obj, t.layer);
-      else this.place2(e, ORIGIN2, alpha, obj, t.layer);
-      const sx = t2?.scale.x ?? 1;
-      const sy = t2?.scale.y ?? 1;
+      const { scale } = this.place2(e, t2 ?? ORIGIN2, alpha, obj, t.layer);
+      const sx = scale.x;
+      const sy = scale.y;
       const ax = t.screen ? 1 / aspect : 1;
       obj.translateX(shift * ax * sx);
       obj.scale.set(w * ax * sx, h * sy, 1);
@@ -396,9 +433,9 @@ export class Renderer {
       let y = 0;
       this.world.each([Transform2D, Camera2D], (e, t, c) => {
         half = c.height / 2;
-        const s = alpha < 1 ? this.prev.get(e) : undefined;
-        x = s ? s.p.x + (t.position.x - s.p.x) * alpha : t.position.x;
-        y = s ? s.p.y + (t.position.y - s.p.y) * alpha : t.position.y;
+        const { position } = this.pose2(e, t, alpha);
+        x = position.x;
+        y = position.y;
       });
       const o = this.ortho;
       o.left = -half * aspect;

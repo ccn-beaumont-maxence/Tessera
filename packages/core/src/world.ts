@@ -33,6 +33,12 @@ export const resource = <T>(
 ): ResourceType<T> => ({ kind: 'resource', name, create, ...options });
 export const event = <T>(name: string): EventType<T> => ({ kind: 'event', name });
 
+/**
+ * Makes the entity's transform relative to `entity`'s (rendering composes the chain).
+ * Destroying a parent destroys its children.
+ */
+export const Parent = component('Parent', () => ({ entity: 0 as Entity }));
+
 /** Marks a query term as written: `system('Move', [mut(Transform3D), Velocity], ...)`. */
 export interface Mut<T> {
   readonly mut: ComponentType<T>;
@@ -172,9 +178,19 @@ export class World {
     return e;
   }
 
+  /** Removes `e` and, recursively, the entities whose Parent is `e`. */
   destroy(e: Entity): void {
     if (!this.names.delete(e)) return;
     for (const s of this.stores.values()) s.delete(e, this.locked > 0);
+    const kids = this.stores.get(Parent as ComponentType<unknown>);
+    if (!kids) return;
+    // ponytail: O(children store) scan per destroy; index children by parent if it shows in profiles.
+    // Backwards: an unlocked delete moves the last (already visited) entry into the hole.
+    for (let i = kids.ents.length - 1; i >= 0; i--) {
+      const c = kids.ents[i] as Entity;
+      if (c >= 0 && (kids.vals[i] as { entity: Entity }).entity === e) this.destroy(c);
+      if (i > kids.ents.length) i = kids.ents.length;
+    }
   }
 
   alive(e: Entity): boolean {

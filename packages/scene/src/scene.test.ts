@@ -1,4 +1,4 @@
-import { component, mut, resource, system, Transform2D, World } from '@tessera/core';
+import { component, mut, Parent, resource, system, Transform2D, World } from '@tessera/core';
 import { dump, find } from '@tessera/headless';
 import { isDown, press } from '@tessera/input';
 import { RigidBody } from '@tessera/physics';
@@ -209,6 +209,35 @@ entities:
     ).toBe(false);
     expect(() => reload(new World(), {} as never)).toThrow('needs a world built by build()');
     void io;
+  });
+
+  it('links children to their parent and reloads them', async () => {
+    const scene = `dimension: 2d
+entities:
+  - name: Ship
+    Transform2D: { position: [5, 0] }
+    children:
+      - name: Gun
+        Transform2D: { position: [1, 0] }
+        children: [{ Transform2D: {} }]
+`;
+    const { w } = await load({ '/game/scene.yaml': scene });
+    const ship = find(w, 'Ship');
+    const gun = find(w, 'Gun');
+    expect(w.get(gun, Parent)?.entity).toBe(ship);
+    expect(dump(w)).toContain(`Parent{entity:${gun}}`);
+    const edited = scene.replace('[1, 0]', '[2, 0]');
+    expect(
+      reload(
+        w,
+        await parseScene('/game/scene.yaml', memoryIO({ ...files, '/game/scene.yaml': edited })),
+      ),
+    ).toBe(true);
+    expect(w.get(gun, Transform2D)?.position.x).toBe(2);
+    const bad = 'dimension: 2d\nentities:\n  - name: A\n    children: 3\n';
+    await expect(load({ '/game/scene.yaml': bad })).rejects.toThrow(
+      'scene.yaml:4: children must be a list',
+    );
   });
 
   it('spawns prefabs at runtime with overrides', async () => {

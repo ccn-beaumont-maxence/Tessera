@@ -25,6 +25,8 @@ entities:
     RigidBody: { lockRotation: true }
     Collider: { shape: capsule, size: [0.8, 1] }
     Player: {}
+    children:                 # transforms relative to the parent; destroyed with it
+      - { name: Gun, Transform2D: { position: [0.5, 0] }, Sprite: { size: [0.4, 0.1] } }
   - { prefab: Coin, Transform2D: { position: [3, 0.5] } }   # entity fields override the prefab's
 ```
 
@@ -41,6 +43,7 @@ to the YAML file. Only the fields you write change; the rest keep the component 
 | Component | Fields (defaults) |
 | --- | --- |
 | Transform2D | position [0,0], rotation 0 (radians), scale [1,1] |
+| Parent | entity (set by `children:`; the transform becomes local to that entity's; physics bodies ignore it, keep them on root entities) |
 | Transform3D | position [0,0,0], rotation identity, scale [1,1,1] |
 | Sprite | image '', size [1,1] (used without image), color white, pixelsPerUnit 100, layer 0 (higher on top), columns 1, rows 1, frame 0, flipX false |
 | Text | text '', size 0.5 (line height), color white, align left/center/right, layer 0, screen false (true: HUD over everything, Transform2D position in [-1,1] with y up, size in tenths of screen height) |

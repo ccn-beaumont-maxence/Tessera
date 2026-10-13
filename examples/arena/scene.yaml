@@ -53,3 +53,7 @@ entities:
     RigidBody: { lockRotation: true }
     Collider: { shape: capsule, size: [0.8, 1.6, 0.8] }
     Player: {}
+    children:
+      - name: Gun
+        Transform3D: { position: [0, 0.1, -0.5] }
+        Mesh: { size: [0.2, 0.2, 0.6], color: '#f2cc8f' }

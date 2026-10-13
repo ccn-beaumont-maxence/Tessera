@@ -3,6 +3,7 @@ import {
   color,
   type Entity,
   type Game,
+  Parent,
   quat,
   type ResourceType,
   resource,
@@ -26,6 +27,7 @@ import {
 } from '@tessera/render';
 import {
   dirOf,
+  type EntityDef,
   join,
   type Loc,
   type Parsed,
@@ -41,6 +43,7 @@ const BUILTIN_COMPONENTS: Record<string, AnyComponent> = Object.fromEntries(
   [
     Transform2D,
     Transform3D,
+    Parent,
     Mesh,
     Light,
     Camera3D,
@@ -224,7 +227,15 @@ export async function build(world: World, parsed: Parsed, io: SceneIO): Promise<
     const e = world.spawn(def.name);
     addSpec(world, e, def.spec, r, def.loc, io);
     state.entities.set(def.key, { entity: e, spec: def.spec });
+    link(world, e, def);
   }
+}
+
+/** Sets the Parent of an entity declared under `children:`. */
+function link(world: World, e: Entity, def: EntityDef): void {
+  if (def.parent === null) return;
+  const p = world.resource(SceneState).entities.get(def.parent);
+  if (p) world.add(e, Parent, { entity: p.entity });
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -260,6 +271,7 @@ export function reload(world: World, next: Parsed): boolean {
       const e = world.spawn(def.name);
       addSpec(world, e, def.spec, r, def.loc, io);
       state.entities.set(def.key, { entity: e, spec: def.spec });
+      link(world, e, def);
       continue;
     }
     const e = cur.entity;

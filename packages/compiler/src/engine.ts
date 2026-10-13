@@ -26,6 +26,7 @@ export const ENGINE: Record<string, StructInfo> = {
     rotation: 'quat',
     scale: 'vec3',
   }),
+  Parent: s('component', '@tessera/core', { entity: 'Entity' }),
   RigidBody: s('component', '@tessera/physics', {
     type: 'string',
     velocity: 'vec3',
