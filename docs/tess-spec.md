@@ -82,7 +82,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Entities | `spawn("Prefab", Comp { field = v, ... }, ...)` returns Entity, `destroy(e)`, `alive(e)`, `has<T>(e)`, `get<T>(e)` (writable; error if missing), `add<T>(e)`, `remove<T>(e)` |
 | Queries | `for (Entity o, Enemy en, Transform3D t : query) { ... }` |
 | Events | `for (Collision c : events<Collision>()) { ... }` (last frame's), `emit(Hit { target = e })` |
-| Input | `down("jump")`, `pressed("jump")`, `released("jump")`, `axis("move")` (vec2, y up) |
+| Input | `down("jump")`, `pressed("jump")`, `released("jump")`, `axis("move")` (vec2, y up), `mouse()` (pointer in the 2D world, vec2), `mouseRay()` (3D: `Ray {origin, dir}` from the camera through the pointer) |
 | Physics | `raycast(origin, dir, maxDist, exclude = none)` returns the hit Entity or `none` |
 | Audio | `play("coin.wav")`, `music("theme.ogg")` |
 | Scenes | `loadScene("level2.yaml", Score, ...)` at the end of the frame: everything is replaced except the listed resources (path relative to the current scene; list it under `scenes:`) |

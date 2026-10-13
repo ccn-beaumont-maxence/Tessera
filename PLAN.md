@@ -148,7 +148,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] `Timer` (`done`, `repeat`, `destroy`) et `ease(kind, t)` ; un tween = Timer + ease + lerp
 
 ## Phase 14 : Pointeur dans le monde
-- [ ] `mouse()` en coordonnées monde (2D), `mouseRay()` (3D)
+- [x] `mouse()` en coordonnées monde (2D), `mouseRay()` (3D)
 
 ## Phase 15 : Raycast riche
 - [ ] `raycast` renvoie `RayHit {entity, point, normal, distance}`, `overlap` en Tess

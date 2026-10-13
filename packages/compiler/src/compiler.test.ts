@@ -70,6 +70,10 @@ describe('type errors', () => {
     ['void f() { if (vec2(1, 2)) {} }', 'condition must be bool, got vec2'],
     ['void f() { break; }', '`break` outside of a loop'],
     [
+      'system S(Ray r) {}',
+      'system parameter "r" must be Entity, a component or a resource (got Ray)',
+    ],
+    [
       'component H { float v; }\nvoid f() { loadScene("a.yaml", H); }',
       'loadScene keeps resources by name: loadScene("level2.yaml", Score)',
     ],
@@ -127,6 +131,26 @@ const comp = (m: Record<string, unknown>, name: string) =>
   m[name] as ComponentType<Record<string, unknown>>;
 
 describe('generated code', () => {
+  it('follows the pointer in 2D and on the 3D ground', async () => {
+    const m = await load(`
+float groundT(Ray r) { return -r.origin.y / r.dir.y; }
+system Aim(Transform3D& t) {
+    auto r = mouseRay();
+    t.position = r.origin + r.dir * groundT(r);
+}
+system Cursor(Transform2D& t) { t.position = mouse(); }
+`);
+    const w = new World();
+    const e = w.spawn();
+    w.add(e, Transform3D);
+    w.add(e, Transform2D);
+    w.addSystem(sys(m, 'Aim'), sys(m, 'Cursor'));
+    w.step();
+    const p = w.get(e, Transform3D)?.position;
+    expect([p?.x, p?.y, p?.z].map((n) => Math.round((n ?? 9) * 1e6) / 1e6 + 0)).toEqual([0, 0, 0]);
+    expect(w.get(e, Transform2D)?.position).toEqual({ x: 0, y: 0 });
+  });
+
   it('drives eased motion from a Timer', async () => {
     const m = await load(`
 system Slide(Transform2D& t, Timer timer) {

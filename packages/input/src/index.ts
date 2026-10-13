@@ -24,6 +24,8 @@ const InputState = resource(
     sticks: { PadLeft: vec2(), PadRight: vec2() },
     /** Pointer in normalized device coordinates: (-1,-1) bottom-left, (1,1) top-right. */
     pointer: vec2(),
+    /** Viewport width / height (pointer NDC to world); 16:9 headless. */
+    aspect: 16 / 9,
     down: new Set<string>(),
     prev: new Set<string>(),
     axes: new Map<string, Vec2>(),
@@ -132,6 +134,9 @@ export function axis(world: World, name: string): Readonly<Vec2> {
 /** Pointer position in normalized device coordinates. Read-only. */
 export const pointer = (world: World): Readonly<Vec2> => world.resource(InputState).pointer;
 
+/** Viewport width / height. */
+export const aspect = (world: World): number => world.resource(InputState).aspect;
+
 /** Holds a raw button, or the first button bound to an action (headless tests, replays). */
 export function press(world: World, buttonOrAction: string): void {
   world.resource(InputState).buttons.add(firstButton(world, buttonOrAction));
@@ -194,6 +199,11 @@ function attach(world: World): void {
     s.pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
     s.pointer.y = 1 - (e.clientY / window.innerHeight) * 2;
   });
+  const resize = () => {
+    s.aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+  };
+  resize();
+  window.addEventListener('resize', resize);
   window.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('blur', () => s.buttons.clear());
 }

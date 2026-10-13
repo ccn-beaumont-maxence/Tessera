@@ -222,7 +222,7 @@ class Compiler {
     const own = this.structs.get(name);
     if (own) return own;
     const e = ENGINE[name];
-    if (e?.module) this.use(e.module, name);
+    if (e?.module) this.use(e.module, e.kind === 'struct' ? `type ${name}` : name);
     return e;
   }
 
@@ -347,7 +347,7 @@ class Compiler {
         continue;
       }
       const info = this.struct(ty);
-      if (!info || info.kind === 'event') {
+      if (!info || info.kind === 'event' || info.kind === 'struct') {
         this.fail(
           `system parameter "${p.name}" must be Entity, a component or a resource (got ${ty})`,
           p,
@@ -400,7 +400,8 @@ class Compiler {
       if (isValue(ty)) this.useType(TS_TYPE[ty] as string);
       return TS_TYPE[ty] as string;
     }
-    this.struct(ty);
+    const info = this.struct(ty);
+    if (info?.kind === 'struct') return this.use(info.module as string, `type ${ty}`).slice(5);
     return `${this.use('@tessera/compiler/runtime', 'type Value').slice(5)}<typeof ${ty}>`;
   }
 
@@ -1221,6 +1222,18 @@ class Compiler {
         const [a] = this.args(e, b, ['string']) as [R];
         return { ty: 'vec2', js: `${this.use('@tessera/input', 'axis')}($w, ${a.js})` };
       }
+      case 'mouse':
+        this.needsWorld(e, b, n);
+        this.args(e, b, []);
+        return {
+          ty: 'vec2',
+          js: `${this.use('@tessera/render', 'mouse')}($w, ${this.scratchOf('vec2')})`,
+        };
+      case 'mouseRay':
+        this.needsWorld(e, b, n);
+        this.args(e, b, []);
+        this.struct('Ray');
+        return { ty: 'Ray', js: `${this.use('@tessera/render', 'mouseRay')}($w)` };
       case 'raycast': {
         this.needsWorld(e, b, n);
         const [o, d, max, ex] = this.args(e, b, ['any', 'any', 'num', 'Entity'], 3) as [
@@ -1305,6 +1318,8 @@ class Compiler {
         'pressed',
         'released',
         'axis',
+        'mouse',
+        'mouseRay',
         'raycast',
         'play',
         'music',

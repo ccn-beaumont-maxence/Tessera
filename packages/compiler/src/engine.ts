@@ -1,6 +1,7 @@
 /** Engine types visible from Tess: module to import from, kind and field types. */
 export interface StructInfo {
-  kind: 'component' | 'resource' | 'event';
+  /** `struct`: read-only record returned by a built-in (TS type exported by `module`). */
+  kind: 'component' | 'resource' | 'event' | 'struct';
   fields: Map<string, string>;
   module: string | null;
 }
@@ -87,6 +88,7 @@ export const ENGINE: Record<string, StructInfo> = {
   Light: s('component', '@tessera/render', { kind: 'string', color: 'color', intensity: 'float' }),
   Camera2D: s('component', '@tessera/render', { height: 'float' }),
   Camera3D: s('component', '@tessera/render', { fov: 'float', near: 'float', far: 'float' }),
+  Ray: s('struct', '@tessera/render', { origin: 'vec3', dir: 'vec3' }),
 };
 
 /** Component names of the value types, in storage order. */

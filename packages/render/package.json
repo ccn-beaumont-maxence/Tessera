@@ -10,6 +10,7 @@
   "dependencies": {
     "@tessera/assets": "workspace:*",
     "@tessera/core": "workspace:*",
+    "@tessera/input": "workspace:*",
     "three": "^0.186.1"
   },
   "devDependencies": {
