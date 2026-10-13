@@ -45,10 +45,10 @@ Acceptation : `pnpm test` et `pnpm typecheck` passent sur un dépôt propre.
 Acceptation : couverture de tests > 90 % sur core, aucune dépendance au DOM.
 
 ## Phase 2 : Mode headless et outils de test
-- [ ] `runFrames(world, n)` avec pas fixe
-- [ ] Dump compact de l'état, une ligne par entité, par exemple :
+- [x] `runFrames(world, n)` avec pas fixe
+- [x] Dump compact de l'état, une ligne par entité, par exemple :
       `#12 Player Transform2D{pos:(3,1.5)} Health{value:80}`
-- [ ] Helpers d'assertion pour Vitest
+- [x] Helpers d'assertion pour Vitest
 Acceptation : un test simule 300 frames et vérifie un état final, deux
 exécutions avec la même graine produisent un dump identique.
 

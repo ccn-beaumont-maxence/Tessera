@@ -1,0 +1,13 @@
+{
+  "name": "@tessera/headless",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --root ../.. packages/headless/"
+  },
+  "dependencies": {
+    "@tessera/core": "workspace:*"
+  }
+}
