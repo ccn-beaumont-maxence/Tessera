@@ -5,6 +5,13 @@ code in **Tess** (C++-flavored, compiled to TypeScript) or TypeScript. See [PLAN
 the language spec in [docs/tess-spec.md](docs/tess-spec.md) and the scene format in
 [docs/scenes.md](docs/scenes.md). Agent instructions: [AGENTS.md](AGENTS.md).
 
+**[Play the demo: The Whispering Wood](https://beaumont-maxence.github.io/tessera/)**: walk a
+night forest with a lantern and gather twelve wisps (WASD, Shift, Space). About 300 lines of
+YAML and Tess in [examples/forest](examples/forest): seeded procedural forest of low-poly models built from primitives, glowing
+materials with bloom and fog, particles, point lights, hierarchy, physics, HUD and a saved best time.
+
+[![The Whispering Wood](docs/forest.png)](https://beaumont-maxence.github.io/tessera/)
+
 ```sh
 pnpm install
 pnpm dev                                    # examples in the browser (YAML edits hot-reload)

@@ -280,6 +280,8 @@ entities:
     expect(w.nameOf(e)).toBe('Coin');
     expect(w.get(e, Transform2D)?.position).toEqual({ x: 9, y: 9 });
     expect(w.get(e, Speed)?.value).toBe(2);
+    const red = { r: 1, g: 0, b: 0, a: 1 };
+    expect(w.get(spawnPrefab(w, 'Coin', { Sprite: { color: red } }), Sprite)?.color).toEqual(red);
     expect(() => spawnPrefab(w, 'Con')).toThrow('unknown prefab "Con" (did you mean Coin?)');
     expect(() => spawnPrefab(new World(), 'Coin')).toThrow('no scene loaded');
   });

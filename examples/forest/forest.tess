@@ -1,0 +1,130 @@
+// Grows the forest once, from the world's seed. Every model is a few low-poly parts parented
+// to a root: trees, mushrooms, crystals, rocks, grass, flowers, wisps.
+resource Forest { bool grown; int trees = 95; int mushrooms = 30; int crystals = 12; int rocks = 26; int grass = 110; int flowers = 40; int fireflies = 18; float radius = 46; float clearing = 13; }
+resource Quest { int found; int total = 12; float time; bool won; float best; }
+component Orb { float phase; float baseY = 1.3; bool taken; }
+component Heart {}
+
+Entity part(Entity root, string shape, vec3 position, vec3 size, color c, float glow) {
+    return spawn("Part", Transform3D { position = position }, Mesh { shape = shape, size = size, color = c, emissive = glow }, Parent { entity = root });
+}
+
+// Uniform point on the ring between two radii.
+vec3 scatter(float inner, float outer) {
+    float a = random(0, PI * 2);
+    float r = sqrt(random(inner * inner, outer * outer));
+    return vec3(cos(a) * r, 0, sin(a) * r);
+}
+
+color leaves(int k) {
+    return k == 0 ? color("#2f7f73") : k == 1 ? color("#4357a3") : k == 2 ? color("#7a49a8") : k == 3 ? color("#2a6b52") : color("#a34d86");
+}
+
+void roundTree(vec3 p, float s) {
+    Entity t = spawn("Tree", Transform3D { position = p + vec3(0, 2.2 * s, 0), scale = vec3(s, s, s), rotation = euler(0, random(0, PI * 2), 0) },
+        Mesh { shape = "cone", size = vec3(0.8, 4.4, 0.8) }, Collider { size = vec3(0.5 * s, 4.4 * s, 0.5 * s) });
+    Entity b = part(t, "cone", vec3(0.45, 0.4, 0), vec3(0.25, 1.6, 0.25), color("#4a3347"), 0);
+    get<Transform3D>(b).rotation = euler(0, 0, -0.8);
+    int k = randomInt(0, 4);
+    color c = leaves(k);
+    color light = leaves((k + 1) % 5);
+    part(t, "ico", vec3(0, 2.4, 0), vec3(3.2, 2.6, 3.2), c, 0);
+    part(t, "ico", vec3(1.2, 1.7, 0.4), vec3(2, 1.7, 2), light, 0);
+    part(t, "ico", vec3(-1.1, 1.9, -0.5), vec3(2.2, 1.8, 2.2), c, 0);
+    part(t, "ico", vec3(0.2, 3.5, 0.1), vec3(1.8, 1.5, 1.8), light, 0);
+    if (random() < 0.3)
+        for (int i = 0; i < 3; i++)
+            part(t, "sphere", vec3(random(-1.2, 1.2), 1, random(-1.2, 1.2)), vec3(0.22, 0.22, 0.22), color("#ffe08a"), 2.5);
+}
+
+void pineTree(vec3 p, float s) {
+    Entity t = spawn("Tree", Transform3D { position = p + vec3(0, 1 * s, 0), scale = vec3(s, s, s) },
+        Mesh { shape = "cylinder", size = vec3(0.4, 2, 0.4) }, Collider { size = vec3(0.4 * s, 2 * s, 0.4 * s) });
+    bool teal = random() < 0.5;
+    color c = teal ? color("#1f5a63") : color("#2b4a7a");
+    color d = teal ? color("#17454d") : color("#20385e");
+    for (int i = 0; i < 4; i++) {
+        Entity l = part(t, "cone", vec3(0, 0.9 + i * 1.05, 0), vec3(3.2 - i * 0.65, 1.9 - i * 0.1, 3.2 - i * 0.65), i % 2 == 0 ? c : d, 0);
+        get<Transform3D>(l).rotation = euler(0, random(0, PI), 0);
+    }
+}
+
+void mushrooms(vec3 p) {
+    int n = randomInt(2, 4);
+    for (int i = 0; i < n; i++) {
+        float s = random(0.6, 1.8);
+        vec3 q = p + vec3(random(-0.8, 0.8), 0, random(-0.8, 0.8));
+        Entity m = spawn("Part", Transform3D { position = q + vec3(0, 0.22 * s, 0), scale = vec3(s, s, s), rotation = euler(random(-0.2, 0.2), 0, random(-0.2, 0.2)) },
+            Mesh { shape = "cylinder", size = vec3(0.12, 0.45, 0.12), color = color("#efe4d2") });
+        part(m, "sphere", vec3(0, 0.24, 0), vec3(0.55, 0.28, 0.55), random() < 0.5 ? color("#ff5fd2") : color("#5fd7ff"), 1.4);
+        part(m, "sphere", vec3(0.12, 0.33, 0.05), vec3(0.08, 0.05, 0.08), color("#ffffff"), 0.6);
+    }
+    if (random() < 0.35) spawn("Glow", Transform3D { position = p + vec3(0, 0.6, 0) });
+}
+
+// A gem is two cones tip to tip; a cluster leans three of them outward.
+void crystals(vec3 p) {
+    color c = random() < 0.6 ? color("#6fe7ff") : color("#b78bff");
+    for (int i = 0; i < 3; i++) {
+        float a = PI * 2 * i / 3 + random(-0.3, 0.3);
+        float h = i == 0 ? random(1.2, 1.8) : random(0.6, 1.1);
+        Entity g = spawn("Part", Transform3D { position = p + vec3(cos(a) * 0.25 * i, h * 0.35, sin(a) * 0.25 * i), rotation = euler(sin(a) * 0.4 * i, 0, -cos(a) * 0.4 * i) },
+            Mesh { shape = "cone", size = vec3(0.35, h * 0.75, 0.35), color = c, emissive = 1.2, roughness = 0.1 });
+        Entity tip = part(g, "cone", vec3(0, -h * 0.45, 0), vec3(0.35, h * 0.15, 0.35), c, 1.2);
+        get<Transform3D>(tip).rotation = euler(PI, 0, 0);
+    }
+}
+
+void rock(vec3 p) {
+    float s = random(0.6, 1.8);
+    Entity r = spawn("Part", Transform3D { position = p + vec3(0, 0.15 * s, 0), scale = vec3(s, s * random(0.5, 0.9), s), rotation = euler(0, random(0, PI), 0) },
+        Mesh { shape = "ico", size = vec3(1.1, 0.8, 0.9), color = color("#575a78"), roughness = 1 });
+    if (random() < 0.6) part(r, "ico", vec3(0.05, 0.3, 0), vec3(0.8, 0.3, 0.7), color("#3f7a5c"), 0);
+}
+
+void tuft(vec3 p) {
+    for (int i = 0; i < 3; i++)
+        spawn("Part", Transform3D { position = p + vec3(random(-0.15, 0.15), 0.2, random(-0.15, 0.15)), rotation = euler(random(-0.4, 0.4), 0, random(-0.4, 0.4)), scale = vec3(1, random(0.6, 1.4), 1) },
+            Mesh { shape = "cone", size = vec3(0.12, 0.55, 0.12), color = color("#4a8f63") });
+}
+
+void flower(vec3 p) {
+    float h = random(0.3, 0.6);
+    Entity f = spawn("Part", Transform3D { position = p + vec3(0, h / 2, 0) }, Mesh { shape = "cylinder", size = vec3(0.03, h, 0.03), color = color("#4a8f63") });
+    part(f, "ico", vec3(0, h / 2, 0), vec3(0.16, 0.1, 0.16), random() < 0.5 ? color("#fff07a") : color("#ff9ef0"), 1.8);
+}
+
+void wisp(vec3 p) {
+    Entity o = spawn("Orb", Transform3D { position = p }, Orb { phase = random(0, PI * 2) });
+    part(o, "sphere", vec3(0, 0, 0), vec3(0.9, 0.9, 0.9), color(1, 0.85, 0.5, 0.25), 1);
+    spawn("OrbLight", Transform3D {}, Parent { entity = o });
+}
+
+system Grow(Forest& f, Quest& q) {
+    if (f.grown) return;
+    f.grown = true;
+    q.best = load("forest.best", 0.0);
+    for (int i = 0; i < f.trees; i++) {
+        vec3 p = scatter(f.clearing, f.radius);
+        if (random() < 0.4) pineTree(p, random(0.8, 1.6));
+        else roundTree(p, random(0.7, 1.4));
+    }
+    for (int i = 0; i < f.mushrooms; i++) mushrooms(scatter(4, f.radius));
+    for (int i = 0; i < f.crystals; i++) crystals(scatter(6, f.radius));
+    for (int i = 0; i < f.rocks; i++) rock(scatter(6, f.radius));
+    for (int i = 0; i < f.grass; i++) tuft(scatter(3, f.radius));
+    for (int i = 0; i < f.flowers; i++) flower(scatter(3, f.radius));
+    for (int i = 0; i < f.fireflies; i++) spawn("Fireflies", Transform3D { position = scatter(0, f.radius) + vec3(0, 1.5, 0) });
+    for (int i = 0; i < q.total; i++) {
+        float a = PI * 2 * i / q.total + random(-0.2, 0.2);
+        float r = random(12, f.radius - 6);
+        wisp(vec3(cos(a) * r, 1.3, sin(a) * r));
+    }
+    // Roots spread from the great tree's foot.
+    for (Entity h, Heart heart : query)
+        for (int i = 0; i < 6; i++) {
+            float a = PI * 2 * i / 6 + 0.3;
+            Entity r = part(h, "cone", vec3(cos(a) * 1.2, -4.4, -sin(a) * 1.2), vec3(0.9, 3, 0.9), color("#4a3150"), 0);
+            get<Transform3D>(r).rotation = euler(0, a, -1.9);
+        }
+}

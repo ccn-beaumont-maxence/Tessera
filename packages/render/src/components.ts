@@ -1,15 +1,18 @@
 import { color, component, mut, system, vec2, vec3 } from '@tessera/core';
 
 /**
- * Primitive 3D shape sized in meters (sphere/capsule/cylinder use size.x as diameter),
+ * Primitive 3D shape sized in meters (sphere/capsule/cylinder/cone/ico use size.x as diameter;
+ * cone and ico are faceted low-poly shapes),
  * or a glTF `model` URL (size then scales the model; color/roughness/metalness are ignored).
+ * `emissive` makes it glow in its own color (0 = off; pairs with `Camera3D.bloom`).
  */
 export const Mesh = component('Mesh', () => ({
-  shape: 'box' as 'box' | 'sphere' | 'plane' | 'capsule' | 'cylinder',
+  shape: 'box' as 'box' | 'sphere' | 'plane' | 'capsule' | 'cylinder' | 'cone' | 'ico',
   size: vec3(1, 1, 1),
   color: color(),
   roughness: 0.8,
   metalness: 0,
+  emissive: 0,
   model: '',
 }));
 
@@ -20,7 +23,15 @@ export const Light = component('Light', () => ({
   intensity: 1,
 }));
 
-export const Camera3D = component('Camera3D', () => ({ fov: 60, near: 0.1, far: 1000 }));
+/** `fog`: distance in meters where the scene fades into `background` (0 = off); `bloom`: glow strength (0 = off). */
+export const Camera3D = component('Camera3D', () => ({
+  fov: 60,
+  near: 0.1,
+  far: 1000,
+  background: color.hex('#1b1d26'),
+  fog: 0,
+  bloom: 0,
+}));
 
 /** Orthographic camera; `height` is the visible world height in meters. */
 export const Camera2D = component('Camera2D', () => ({ height: 10 }));

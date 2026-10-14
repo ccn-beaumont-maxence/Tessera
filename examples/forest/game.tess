@@ -1,0 +1,95 @@
+// The Whispering Wood: wander the night forest with a lantern and gather every wisp.
+using "./forest.tess";
+
+component Wanderer { float heading; float speed = 4.5; float turn = 2.4; }
+component Follow { float distance = 5.5; float height = 1.6; float sharpness = 4; }
+component Crown {}
+component Stride { float phase; }
+component Hud {}
+component Title {}
+
+system Walk(Entity e, RigidBody& body, Wanderer& w, Transform3D& t) {
+    vec2 a = axis("move");
+    w.heading -= a.x * w.turn * dt;
+    float speed = w.speed * (down("run") ? 1.8 : 1);
+    body.velocity.x = -sin(w.heading) * a.y * speed;
+    body.velocity.z = -cos(w.heading) * a.y * speed;
+    bool grounded = raycast(t.position, vec3(0, -1, 0), 0.85, e).entity != none;
+    if (pressed("jump") && grounded) body.velocity.y = 7;
+    t.rotation = axisAngle(vec3(0, 1, 0), w.heading);
+}
+
+// Walk cycle: the body hops and sways with the wanderer's speed.
+system WalkCycle(Stride& s, Transform3D& t) {
+    for (Wanderer w, RigidBody b : query) {
+        float speed = len(vec2(b.velocity.x, b.velocity.z));
+        s.phase += speed * dt * 2.2;
+        float k = min(1, speed / 3);
+        t.position.y = abs(sin(s.phase)) * 0.09 * k;
+        t.rotation = euler(-0.12 * k, 0, sin(s.phase) * 0.07 * k);
+    }
+}
+
+// Third-person camera: eases toward a spot behind the wanderer and looks at their head.
+system CameraFollow(Transform3D& t, Follow f) {
+    for (Entity e, Wanderer w, Transform3D p : query) {
+        vec3 head = p.position + vec3(0, 1, 0);
+        vec3 back = normalize(vec3(sin(w.heading), f.height / f.distance, cos(w.heading)));
+        float reach = len(vec2(f.distance, f.height));
+        RayHit hit = raycast(head, back, reach, e);   // a trunk in the way pulls the camera in
+        if (hit.entity != none) reach = max(hit.distance - 0.3, 1);
+        t.position = lerp(t.position, head + back * reach, min(1, dt * f.sharpness));
+        vec3 d = head - t.position;
+        t.rotation = axisAngle(vec3(0, 1, 0), atan2(-d.x, -d.z)) * axisAngle(vec3(1, 0, 0), atan2(d.y, len(vec2(d.x, d.z))));
+    }
+}
+
+system Bob(Orb o, Transform3D& t) {
+    // ponytail: taken wisps sink out of sight instead of being destroyed, so the light count
+    // (and three.js shaders) never change mid-game.
+    t.position.y = o.taken ? -50 : o.baseY + sin(time * 2 + o.phase) * 0.25;
+}
+
+system Collect(Entity e, Orb& o, Quest& q) {
+    for (Collision c : events<Collision>()) {
+        if (!c.started || o.taken) continue;
+        Entity other = c.a == e ? c.b : (c.b == e ? c.a : none);
+        if (other == none || !has<Wanderer>(other)) continue;
+        spawn("Sparkle", Transform3D { position = get<Transform3D>(e).position });
+        o.taken = true;
+        q.found++;
+        if (q.found == q.total) {
+            q.won = true;
+            if (q.best == 0 || q.time < q.best) {
+                q.best = q.time;
+                save("forest.best", q.best);
+            }
+        }
+    }
+}
+
+// The great tree glows once every wisp is home.
+system Awaken(Entity e, Crown c, Quest q) {
+    float k = min(1, dt * 0.6);
+    if (has<Mesh>(e)) get<Mesh>(e).emissive = lerp(get<Mesh>(e).emissive, q.won ? 1.6 : 0.15, k);
+    if (has<Light>(e)) get<Light>(e).intensity = lerp(get<Light>(e).intensity, q.won ? 60 : 0, k);
+    if (has<Particles>(e)) get<Particles>(e).rate = q.won ? 50 : 0;
+}
+
+string clock(float seconds) {
+    int s = floor(seconds);
+    int m = s / 60;
+    return m + ":" + (s % 60 < 10 ? "0" : "") + s % 60;
+}
+
+system ShowHud(Text& t, Hud h, Quest& q) {
+    if (!q.won) q.time += dt;
+    t.text = "Wisps " + q.found + "/" + q.total + "   " + clock(q.time)
+        + (q.best > 0 ? "   best " + clock(q.best) : "")
+        + "\nWASD walk  Shift run  Space jump";
+}
+
+system ShowTitle(Text& t, Title title, Quest q) {
+    t.text = q.won ? "The forest awakens" : "The Whispering Wood\nfind the twelve wisps";
+    t.color.a = q.won ? 1 : clamp(5 - time, 0, 1);
+}

@@ -1,0 +1,94 @@
+dimension: 3d
+scripts: [./game.tess]
+systems: [Grow, Walk, WalkCycle, CameraFollow, Bob, Collect, Awaken, ShowHud, ShowTitle]
+input:
+  move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
+  jump: [Space, PadA]
+  run: [ShiftLeft, PadRT]
+physics: { gravity: [0, -18] }
+resources:
+  Forest: {}
+  Quest: {}
+
+prefabs:
+  Part:                          # one piece of a model; forest.tess sets its shape, size and color
+    Transform3D: {}
+    Mesh: {}
+  Tree:
+    Transform3D: {}
+    Mesh: { color: '#4a3347' }
+  Glow:
+    Transform3D: {}
+    Light: { kind: point, color: '#ff7ce0', intensity: 3 }
+  Fireflies:
+    Transform3D: {}
+    Particles: { rate: 3, lifetime: 5, speed: 0.4, spread: 6.3, gravity: -0.05, color: '#f6ff8a', endColor: '#7dffb0', size: 0.09, endSize: 0, max: 20 }
+  Orb:
+    Transform3D: {}
+    Mesh: { shape: ico, size: [0.4, 0.4, 0.4], color: '#ffe38a', emissive: 3 }
+    Collider: { shape: sphere, size: [1.2, 1.2, 1.2], sensor: true }
+    Particles: { rate: 8, lifetime: 1.2, speed: 0.3, spread: 6.3, gravity: -0.4, color: '#fff3b0', endColor: '#ff9ef0', size: 0.1, max: 12 }
+    Orb: {}
+  OrbLight:
+    Transform3D: {}
+    Light: { kind: point, color: '#ffd98a', intensity: 2 }
+  Sparkle:
+    Transform3D: {}
+    Particles: { rate: 0, burst: 40, lifetime: 1, speed: 4, spread: 6.3, gravity: -1, color: '#fff3b0', endColor: '#ff7ce0', size: 0.15 }
+    Timer: { duration: 1.2, destroy: true }
+
+entities:
+  - name: Camera
+    Transform3D: { position: [0, 3, 14] }
+    Camera3D: { fov: 60, far: 60, background: '#0c0a1d', fog: 42, bloom: 0.9 }
+    Follow: {}
+  - name: Moon
+    Transform3D: { rotation: [-0.9, 0.6, 0] }
+    Light: { color: '#8fa3ff', intensity: 1.3 }
+  - name: Ambient
+    Light: { kind: ambient, color: '#6a5bb0', intensity: 1 }
+  - name: Ground
+    Transform3D: { position: [0, -0.5, 0] }
+    Mesh: { size: [140, 1, 140], color: '#24403a' }
+    Collider: { size: [140, 1, 140] }
+  - name: Heartwood                # the great tree in the clearing; wakes up when every wisp is found
+    Transform3D: { position: [0, 5, 0] }
+    Mesh: { shape: cone, size: [2.6, 10, 2.6], color: '#4a3150' }
+    Collider: { size: [1.6, 10, 1.6] }
+    Heart: {}
+    children:
+      - { name: Crown, Transform3D: { position: [0, 3.5, 0] }, Mesh: { shape: ico, size: [7, 4.5, 7], color: '#c58bff', emissive: 0.15 }, Crown: {} }
+      - { name: CrownW, Transform3D: { position: [-3, 2, 1] }, Mesh: { shape: ico, size: [4, 3, 4], color: '#a46bff', emissive: 0.15 }, Crown: {} }
+      - { name: CrownE, Transform3D: { position: [3, 2.3, -1] }, Mesh: { shape: ico, size: [4.5, 3.2, 4.5], color: '#e08bff', emissive: 0.15 }, Crown: {} }
+      - { name: CrownN, Transform3D: { position: [0.5, 2.1, -3] }, Mesh: { shape: ico, size: [3.6, 2.8, 3.6], color: '#b47bff', emissive: 0.15 }, Crown: {} }
+      - { name: CrownTop, Transform3D: { position: [0.5, 5.6, 0.5] }, Mesh: { shape: ico, size: [4, 3, 4], color: '#ffa8f0', emissive: 0.15 }, Crown: {} }
+      - { name: CrownLight, Transform3D: { position: [0, 1, 0] }, Light: { kind: point, color: '#c58bff', intensity: 0 }, Crown: {} }
+      - { name: Petals, Transform3D: { position: [0, 3.5, 0] }, Particles: { rate: 0, lifetime: 6, speed: 1.5, spread: 6.3, gravity: 0.3, color: '#ffd1f7', endColor: '#c58bff', size: 0.18, max: 300 }, Crown: {} }
+  - name: Hud
+    Transform2D: { position: [-0.95, 0.9] }
+    Text: { screen: true, align: left, size: 0.55, color: '#ffe9b8' }
+    Hud: {}
+  - name: Title
+    Transform2D: { position: [0, 0.6] }
+    Text: { screen: true, align: center, size: 0.9, color: '#ffd1f7' }
+    Title: {}
+  - name: Wanderer                 # collider on the root; the body bobs as it walks (Stride)
+    Transform3D: { position: [0, 1, 8] }
+    RigidBody: { lockRotation: true }
+    Collider: { shape: capsule, size: [0.7, 1.4, 0.7] }
+    Wanderer: {}
+    children:
+      - name: Body
+        Transform3D: {}
+        Stride: {}
+        children:
+          - { name: Cloak, Transform3D: { position: [0, -0.15, 0] }, Mesh: { shape: cone, size: [0.95, 1.15, 0.95], color: '#3b4fa0' } }
+          - { name: Scarf, Transform3D: { position: [0, 0.42, 0] }, Mesh: { shape: cylinder, size: [0.42, 0.12, 0.42], color: '#d1495b' } }
+          - { name: Head, Transform3D: { position: [0, 0.68, 0] }, Mesh: { shape: ico, size: [0.48, 0.48, 0.48], color: '#1b1d33' } }
+          - { name: Hood, Transform3D: { position: [0, 0.95, 0.03] }, Mesh: { shape: cone, size: [0.62, 0.6, 0.62], color: '#3b4fa0' } }
+          - { name: EyeL, Transform3D: { position: [-0.09, 0.7, -0.22] }, Mesh: { shape: sphere, size: [0.07, 0.07, 0.07], color: '#fff3b0', emissive: 2 } }
+          - { name: EyeR, Transform3D: { position: [0.09, 0.7, -0.22] }, Mesh: { shape: sphere, size: [0.07, 0.07, 0.07], color: '#fff3b0', emissive: 2 } }
+          - { name: Staff, Transform3D: { position: [0.42, 0.15, -0.2] }, Mesh: { shape: cylinder, size: [0.05, 1.6, 0.05], color: '#6b4a3a' } }
+          - { name: Lantern, Transform3D: { position: [0.42, 0.95, -0.2] }, Mesh: { shape: ico, size: [0.22, 0.26, 0.22], color: '#ffc46b', emissive: 1.8 } }
+          - { name: LanternCap, Transform3D: { position: [0.42, 1.12, -0.2] }, Mesh: { shape: cone, size: [0.24, 0.12, 0.24], color: '#2a2233' } }
+          - { name: LanternLight, Transform3D: { position: [0.42, 1, -0.2] }, Light: { kind: point, color: '#ffb35c', intensity: 4 } }

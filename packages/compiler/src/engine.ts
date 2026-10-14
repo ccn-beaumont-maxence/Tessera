@@ -107,6 +107,7 @@ export const ENGINE: Record<string, StructInfo> = {
     color: 'color',
     roughness: 'float',
     metalness: 'float',
+    emissive: 'float',
     model: 'string',
   }),
   Animator: s('component', '@tessera/render', {
@@ -117,7 +118,14 @@ export const ENGINE: Record<string, StructInfo> = {
   }),
   Light: s('component', '@tessera/render', { kind: 'string', color: 'color', intensity: 'float' }),
   Camera2D: s('component', '@tessera/render', { height: 'float' }),
-  Camera3D: s('component', '@tessera/render', { fov: 'float', near: 'float', far: 'float' }),
+  Camera3D: s('component', '@tessera/render', {
+    fov: 'float',
+    near: 'float',
+    far: 'float',
+    background: 'color',
+    fog: 'float',
+    bloom: 'float',
+  }),
   RayHit: s('struct', '@tessera/physics', {
     entity: 'Entity',
     point: 'vec3',
