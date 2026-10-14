@@ -171,6 +171,21 @@ system Noise(Transform3D t, Sfx& s) {
     expect(w.resourceList().find(([t]) => t.name === 'Sfx')?.[1]).toEqual({ id: 1 });
   });
 
+  it('saves and loads values', async () => {
+    const m = await load(`
+resource Best { int score; }
+system Keep(Best& b) {
+    b.score = load("t-best", 3) + 1;
+    save("t-best", b.score);
+}
+`);
+    const w = new World();
+    w.addSystem(sys(m, 'Keep'));
+    w.step();
+    w.step();
+    expect(w.resourceList()[0]?.[1]).toEqual({ score: 5 });
+  });
+
   it('drives eased motion from a Timer', async () => {
     const m = await load(`
 system Slide(Transform2D& t, Timer timer) {

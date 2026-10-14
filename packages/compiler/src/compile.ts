@@ -1318,6 +1318,20 @@ class Compiler {
           js: `${this.use('@tessera/audio', 'playSound')}($w, ${url}${opts.length ? `, { ${opts.join(', ')} }` : ''})`,
         };
       }
+      case 'save': {
+        this.needsWorld(e, b, n);
+        const [k, v] = this.args(e, b, ['string', 'any']) as [R, R];
+        if (!isNum(v.ty) && v.ty !== 'string' && v.ty !== 'bool')
+          this.fail(`save() stores numbers, strings and bools, got ${v.ty}`, e);
+        return { ty: 'void', js: `${core('save')}(${k.js}, ${v.js})` };
+      }
+      case 'load': {
+        this.needsWorld(e, b, n);
+        const [k, d] = this.args(e, b, ['string', 'any']) as [R, R];
+        if (!isNum(d.ty) && d.ty !== 'string' && d.ty !== 'bool')
+          this.fail(`load(key, default): the default must be a number, string or bool`, e);
+        return { ty: d.ty, js: `${core('load')}(${k.js}, ${d.js})` };
+      }
       case 'stop': {
         this.needsWorld(e, b, n);
         const [id] = this.args(e, b, ['num']) as [R];
@@ -1395,6 +1409,8 @@ class Compiler {
         'volume',
         'music',
         'loadScene',
+        'save',
+        'load',
         'log',
         'euler',
         'axisAngle',

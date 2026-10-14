@@ -86,6 +86,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Physics | `raycast(origin, dir, maxDist, exclude = none)` returns `RayHit {entity, point, normal, distance}` (`entity == none`: no hit; vec2 fields in 2D), `for (Entity o : overlap("box", size, position)) { ... }` (Collider shapes) |
 | Audio | `play("hit.wav", volume = 1, pitch = 1)` or `play("hit.wav", position, volume, pitch)` (3D sound heard from the camera) return an int id for `stop(id)`; `music("theme.ogg")` (`""` stops), `volume("music", 0.5)` (buses master, music, sfx) |
 | Scenes | `loadScene("level2.yaml", Score, ...)` at the end of the frame: everything is replaced except the listed resources (path relative to the current scene; list it under `scenes:`) |
+| Save | `save("best", score.best)`, `load("best", 0)` (type of the default; kept across runs in browsers) |
 | Debug | `log(a, b, ...)` |
 
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,

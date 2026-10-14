@@ -2,6 +2,7 @@ export * from './game';
 export * from './math';
 export * from './particles';
 export * from './rng';
+export * from './save';
 export * from './tilemap';
 export * from './timer';
 export * from './transform';
