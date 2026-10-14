@@ -157,7 +157,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] Composant `Tilemap`, un seul mesh, colliders fusionnés ; sol du platformer en tilemap
 
 ## Phase 17 : Particules
-- [ ] Composant `Particles`, pool fixe, RNG du monde, `burst(e, n)`
+- [x] Composant `Particles`, pool fixe, RNG du monde, champ `burst` ; explosion dans l'arène
 
 ## Phase 18 : Animations glTF
 - [ ] Composant `Animator` (clips glTF), temps piloté par la simulation

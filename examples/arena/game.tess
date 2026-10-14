@@ -67,6 +67,7 @@ system Hits(Entity e, Enemy& en, Game& game) {
             destroy(other);
             en.hp--;
             if (en.hp <= 0) {
+                spawn("Boom", Transform3D { position = get<Transform3D>(e).position });
                 destroy(e);
                 game.kills++;
             }

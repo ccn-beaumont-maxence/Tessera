@@ -1,5 +1,6 @@
 export * from './game';
 export * from './math';
+export * from './particles';
 export * from './rng';
 export * from './tilemap';
 export * from './timer';

@@ -120,6 +120,11 @@ export const Hits = system(
         w.destroy(other);
         en.hp--;
         if (en.hp <= 0) {
+          const t = w.get(e, Transform3D);
+          if (t)
+            spawnPrefab(w, 'Boom', {
+              Transform3D: { position: [t.position.x, t.position.y, t.position.z] },
+            });
           w.destroy(e);
           game.kills++;
         }

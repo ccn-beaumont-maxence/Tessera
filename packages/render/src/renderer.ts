@@ -5,9 +5,12 @@ import {
   compose3D,
   type DeepReadonly,
   type Entity,
+  PARTICLE_STRIDE,
+  Particles,
   type Pose2D,
   type Pose3D,
   parentOf,
+  particlesOf,
   type Quat,
   quat,
   Tilemap,
@@ -75,6 +78,11 @@ function tileGeometry(t: DeepReadonly<TilemapData>): THREE.BufferGeometry {
   return g;
 }
 
+interface ParticleNode
+  extends Node<THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>> {
+  max: number;
+}
+
 interface TextNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>> {
   canvas: HTMLCanvasElement;
   align: string;
@@ -138,6 +146,9 @@ export class Renderer {
   private readonly lights = new Map<Entity, Node<THREE.Light>>();
   private readonly texts = new Map<Entity, TextNode>();
   private readonly tilemaps = new Map<Entity, TilemapNode>();
+  private readonly particles = new Map<Entity, ParticleNode>();
+  private readonly dummy = new THREE.Object3D();
+  private readonly tint = new THREE.Color();
   /** Screen-space overlay (Text with `screen: true`), drawn after the scene. */
   private readonly hud = new THREE.Scene();
   private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
@@ -196,7 +207,9 @@ export class Renderer {
     this.syncTilemaps(alpha);
     this.syncLights(alpha);
     this.syncTexts(alpha);
-    this.gl.render(this.scene, this.camera(alpha));
+    const camera = this.camera(alpha);
+    this.syncParticles(camera);
+    this.gl.render(this.scene, camera);
     if (this.hud.children.length > 0) {
       this.gl.autoClear = false;
       this.gl.clearDepth();
@@ -422,6 +435,50 @@ export class Renderer {
       n.obj.scale.set(scale.x, scale.y, 1);
     });
     this.sweep(this.tilemaps);
+  }
+
+  /** Particles are camera-facing quads; size and color blend over their life. */
+  private syncParticles(camera: THREE.Camera): void {
+    this.world.each([Particles], (e, p) => {
+      const pool = particlesOf(this.world, e);
+      let n = this.particles.get(e);
+      if (!n || n.max !== p.max) {
+        if (n) this.drop(n);
+        const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
+        const obj = new THREE.InstancedMesh(this.spriteGeometry, mat, p.max);
+        obj.frustumCulled = false;
+        this.scene.add(obj);
+        n = { obj, key: '', stamp: 0, max: p.max };
+        this.particles.set(e, n);
+      }
+      n.stamp = this.stamp;
+      const { obj } = n;
+      obj.count = pool?.count ?? 0;
+      obj.material.opacity = p.color.a;
+      const d = this.dummy;
+      d.quaternion.copy(camera.quaternion);
+      const data = pool?.data;
+      for (let i = 0; data && i < obj.count; i++) {
+        const o = i * PARTICLE_STRIDE;
+        const k = Math.min((data[o + 6] as number) / p.lifetime, 1);
+        d.position.set(data[o] as number, data[o + 1] as number, data[o + 2] as number);
+        d.scale.setScalar(Math.max(p.size + (p.endSize - p.size) * k, 1e-4));
+        d.updateMatrix();
+        obj.setMatrixAt(i, d.matrix);
+        const c = p.color;
+        const f = p.endColor;
+        this.tint.setRGB(
+          c.r + (f.r - c.r) * k,
+          c.g + (f.g - c.g) * k,
+          c.b + (f.b - c.b) * k,
+          THREE.SRGBColorSpace,
+        );
+        obj.setColorAt(i, this.tint);
+      }
+      obj.instanceMatrix.needsUpdate = true;
+      if (obj.instanceColor) obj.instanceColor.needsUpdate = true;
+    });
+    this.sweep(this.particles);
   }
 
   private syncTexts(alpha: number): void {

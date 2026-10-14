@@ -4,6 +4,8 @@ import {
   type Entity,
   type Game,
   Parent,
+  ParticleSystem,
+  Particles,
   quat,
   type ResourceType,
   resource,
@@ -49,6 +51,7 @@ const BUILTIN_COMPONENTS: Record<string, AnyComponent> = Object.fromEntries(
     Parent,
     Timer,
     Tilemap,
+    Particles,
     Mesh,
     Light,
     Camera3D,
@@ -94,7 +97,7 @@ async function registry(parsed: Parsed, io: SceneIO): Promise<Registry> {
   const r: Registry = {
     components: { ...BUILTIN_COMPONENTS },
     resources: {},
-    systems: { SpriteAnimate, Timers },
+    systems: { SpriteAnimate, Timers, Particles: ParticleSystem },
   };
   for (const [i, script] of parsed.scripts.entries()) {
     let mod: Record<string, unknown>;
@@ -254,6 +257,7 @@ function instantiate(world: World, { parsed, registry: r }: Prepared): void {
   }
 
   const order = [...parsed.systems];
+  if (!order.includes('Particles')) order.unshift('Particles');
   if (!order.includes('Timers')) order.unshift('Timers');
   if (parsed.input && !order.includes('Input')) order.unshift('Input');
   if (usesPhysics(parsed) && !order.includes('Physics')) order.push('Physics');
