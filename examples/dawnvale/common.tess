@@ -1,0 +1,47 @@
+// Shared data for Dawnvale: components, resources, events and the part() model helper.
+
+component Hero { int level = 1; int xp; float hp = 100; Entity target; float swingCd; float strikeCd; float swing; float combat; float heading; float dead; }
+component Mob { string kind; string label; int level = 1; float hp = 40; float maxHp = 40; float dmgMin = 3; float dmgMax = 5; int xp = 30; float speed = 3.5; float aggro = 9; float cd; float dead; float respawn = 20; bool angry; float think; vec3 home; vec3 goal; float heading; }
+component Npc { string id; string label; }
+component Look { color skin = color("#e8b48a"); color shirt = color("#3f6fb5"); color pants = color("#4a3b2a"); color hair = color("#5a3a1a"); string gear; bool robe; }
+component Quest { int order; string title; string text; string done; string giver; string turnIn; string goal; string target; string item; int need = 1; int have; int state; int requires; int xp = 100; float chance = 1; }
+component Camp { string prefab; int count = 5; float radius = 8; }
+component Pickup { string item; float gone; vec3 home; }
+component Marker { string npc; }
+component Billboard {}
+component Float { float rise = 1.2; }
+component Limb { float phase; float amp = 0.6; }
+component Weapon {}
+component Ring {}
+
+resource View { float yaw; }
+resource Msg { string text; float time; }
+resource Grown { bool done; }
+
+event Bite { int amount; }
+event Reward { int xp; }
+event Killed { string kind; vec3 at; int xp; }
+
+// Quest states.
+const int LOCKED = 0;
+const int AVAILABLE = 1;
+const int ACTIVE = 2;
+const int READY = 3;
+const int DONE = 4;
+
+Entity part(Entity root, string shape, vec3 position, vec3 size, color c) {
+    return spawn("Part", Transform3D { position = position }, Mesh { shape = shape, size = size, color = c }, Parent { entity = root });
+}
+
+void say(Msg& m, string text) {
+    m.text = text;
+    m.time = 6;
+}
+
+int xpNeed(int level) { return 100 + level * 180; }
+float maxHp(int level) { return 80 + level * 20; }
+
+// Floating combat text above a position.
+void floatText(vec3 at, string text, color c) {
+    spawn("Float", Transform3D { position = at + vec3(random(-0.3, 0.3), 2.2, random(-0.3, 0.3)) }, Text { text = text, color = c });
+}

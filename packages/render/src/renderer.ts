@@ -170,7 +170,7 @@ export class Renderer {
   private readonly background = new THREE.Color(0x1b1d26);
   private readonly fog = new THREE.Fog(this.background, 0, 1);
   private readonly tint = new THREE.Color();
-  /** Screen-space overlay (Text with `screen: true`), drawn after the scene. */
+  /** Screen-space overlay (Text and Sprite with `screen: true`), drawn after the scene. */
   private readonly hud = new THREE.Scene();
   private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   private stamp = 0;
@@ -236,8 +236,8 @@ export class Renderer {
     this.syncSprites(alpha);
     this.syncTilemaps(alpha);
     this.syncLights(alpha);
-    this.syncTexts(alpha);
     const camera = this.camera(alpha);
+    this.syncTexts(alpha, camera);
     this.syncParticles(camera);
     if (this.bloom > 0) this.postProcess(camera);
     else this.gl.render(this.scene, camera);
@@ -404,6 +404,8 @@ export class Renderer {
   }
 
   private syncSprites(alpha: number): void {
+    const { width, height } = this.gl.domElement;
+    const aspect = width / Math.max(height, 1);
     this.world.each([Transform2D, Sprite], (e, t, s) => {
       let n = this.sprites.get(e);
       if (!n || n.key !== s.image) {
@@ -414,7 +416,6 @@ export class Renderer {
           side: THREE.DoubleSide,
         });
         const obj = new THREE.Mesh(this.spriteGeometry, mat);
-        this.scene.add(obj);
         const node: SpriteNode = { obj, key: s.image, stamp: 0, px: null };
         if (s.image) {
           obj.visible = false;
@@ -436,6 +437,8 @@ export class Renderer {
       }
       n.stamp = this.stamp;
       const { obj, px } = n;
+      const parent = s.screen ? this.hud : this.scene;
+      if (obj.parent !== parent) parent.add(obj);
       setColor(obj.material.color, s.color);
       obj.material.opacity = s.color.a;
       let w = s.size.x;
@@ -450,7 +453,12 @@ export class Renderer {
         tex.offset.set(col / s.columns, 1 - (row + 1) / s.rows);
       }
       const { scale } = this.place2(e, t, alpha, obj, s.layer);
-      obj.scale.set(w * scale.x * (s.flipX ? -1 : 1), h * scale.y, 1);
+      // Screen sprite: same units as screen Text (tenths of the screen height).
+      const k = s.screen ? 0.2 : 1;
+      const ax = s.screen ? k / aspect : 1;
+      const sw = w * ax * scale.x;
+      obj.scale.set(sw * (s.flipX ? -1 : 1), h * k * scale.y, 1);
+      if (s.align !== 'center') obj.translateX(s.align === 'left' ? sw / 2 : -sw / 2);
     });
     this.sweep(this.sprites);
   }
@@ -547,7 +555,7 @@ export class Renderer {
     this.sweep(this.particles);
   }
 
-  private syncTexts(alpha: number): void {
+  private syncTexts(alpha: number, camera: THREE.Camera): void {
     const { width, height } = this.gl.domElement;
     const aspect = width / Math.max(height, 1);
     this.world.each([Text], (e, t) => {
@@ -586,11 +594,13 @@ export class Renderer {
       const t3 = t.screen ? undefined : this.world.get(e, Transform3D);
       if (t3) {
         const { scale } = this.place3(e, t3, alpha, obj);
+        if (t.billboard) obj.quaternion.copy(camera.quaternion);
         obj.translateX(shift * scale.x);
         obj.scale.set(w * scale.x, h * scale.y, 1);
         return;
       }
       const { scale } = this.place2(e, t2 ?? ORIGIN2, alpha, obj, t.layer);
+      obj.renderOrder += 0.5; // text over sprites of the same layer
       const sx = scale.x;
       const sy = scale.y;
       const ax = t.screen ? 1 / aspect : 1;

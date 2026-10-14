@@ -1,0 +1,146 @@
+// Low-poly models built from parts: people, wolves, kobolds, houses, trees.
+using "./common.tess";
+
+void limb(Entity p, float phase, float amp) {
+    add<Limb>(p);
+    get<Limb>(p).phase = phase;
+    get<Limb>(p).amp = amp;
+}
+
+// A person about 1.8 m tall; the root sits at the body's center (0.9 m up).
+void humanoid(Entity root, Look l) {
+    color skin = l.skin;
+    if (l.robe) {
+        part(root, "cone", vec3(0, -0.35, 0), vec3(0.85, 1.15, 0.85), l.shirt);
+    } else {
+        limb(part(root, "box", vec3(-0.13, -0.5, 0), vec3(0.22, 0.8, 0.25), l.pants), 0, 0.6);
+        limb(part(root, "box", vec3(0.13, -0.5, 0), vec3(0.22, 0.8, 0.25), l.pants), PI, 0.6);
+    }
+    part(root, "box", vec3(0, 0.25, 0), vec3(0.6, 0.72, 0.36), l.shirt);
+    part(root, "box", vec3(0, -0.08, 0), vec3(0.62, 0.1, 0.38), color("#3a2a1c"));
+    limb(part(root, "box", vec3(-0.41, 0.22, 0), vec3(0.18, 0.66, 0.2), l.shirt), PI, 0.5);
+    Entity arm = part(root, "box", vec3(0.41, 0.22, 0), vec3(0.18, 0.66, 0.2), l.shirt);
+    limb(arm, 0, 0.5);
+    part(root, "sphere", vec3(0, 0.82, 0), vec3(0.42, 0.44, 0.42), skin);
+    part(root, "ico", vec3(0, 0.95, 0.04), vec3(0.46, 0.26, 0.46), l.hair);
+    part(root, "box", vec3(-0.08, 0.84, -0.2), vec3(0.05, 0.05, 0.02), color("#1b1b24"));
+    part(root, "box", vec3(0.08, 0.84, -0.2), vec3(0.05, 0.05, 0.02), color("#1b1b24"));
+    if (l.gear == "sword") {
+        Entity w = spawn("Pivot", Transform3D { position = vec3(0.45, -0.05, -0.15) }, Weapon {}, Parent { entity = root });
+        part(w, "box", vec3(0, 0.45, -0.05), vec3(0.08, 0.9, 0.03), color("#d8dde6"));
+        part(w, "box", vec3(0, 0.02, -0.05), vec3(0.3, 0.06, 0.08), color("#c9a227"));
+        part(root, "box", vec3(-0.52, 0.15, -0.05), vec3(0.07, 0.6, 0.5), color("#2d4f9e"));
+        part(root, "box", vec3(-0.56, 0.15, -0.05), vec3(0.02, 0.3, 0.2), color("#e3c04f"));
+    } else if (l.gear == "staff") {
+        part(root, "cylinder", vec3(0.45, 0.2, -0.15), vec3(0.06, 1.9, 0.06), color("#6b4a3a"));
+        Entity gem = part(root, "ico", vec3(0.45, 1.2, -0.15), vec3(0.18, 0.18, 0.18), color("#ffe38a"));
+        get<Mesh>(gem).emissive = 2;
+    } else if (l.gear == "pitchfork") {
+        part(root, "cylinder", vec3(0.45, 0.2, -0.15), vec3(0.05, 1.8, 0.05), color("#8a6a45"));
+        part(root, "box", vec3(0.45, 1.1, -0.15), vec3(0.3, 0.05, 0.05), color("#9aa0a8"));
+    }
+}
+
+void wolf(Entity root, color fur) {
+    part(root, "box", vec3(0, 0.05, 0), vec3(0.5, 0.48, 1.05), fur);
+    part(root, "box", vec3(0, 0.12, -0.35), vec3(0.56, 0.56, 0.45), fur);
+    part(root, "box", vec3(0, 0.32, -0.7), vec3(0.38, 0.36, 0.42), fur);
+    part(root, "box", vec3(0, 0.22, -0.98), vec3(0.2, 0.17, 0.3), fur * 0.8);
+    part(root, "box", vec3(0, 0.25, -1.13), vec3(0.08, 0.07, 0.04), color("#1b1b24"));
+    part(root, "cone", vec3(-0.12, 0.58, -0.66), vec3(0.12, 0.2, 0.1), fur);
+    part(root, "cone", vec3(0.12, 0.58, -0.66), vec3(0.12, 0.2, 0.1), fur);
+    Entity eye = part(root, "box", vec3(-0.1, 0.38, -0.9), vec3(0.05, 0.04, 0.02), color("#ffd23f"));
+    get<Mesh>(eye).emissive = 1.5;
+    eye = part(root, "box", vec3(0.1, 0.38, -0.9), vec3(0.05, 0.04, 0.02), color("#ffd23f"));
+    get<Mesh>(eye).emissive = 1.5;
+    Entity tail = part(root, "cone", vec3(0, 0.12, 0.65), vec3(0.14, 0.5, 0.14), fur);
+    get<Transform3D>(tail).rotation = euler(1.2, 0, 0);
+    limb(part(root, "box", vec3(-0.17, -0.35, -0.35), vec3(0.13, 0.45, 0.13), fur), 0, 0.7);
+    limb(part(root, "box", vec3(0.17, -0.35, -0.35), vec3(0.13, 0.45, 0.13), fur), PI, 0.7);
+    limb(part(root, "box", vec3(-0.17, -0.35, 0.38), vec3(0.13, 0.45, 0.13), fur), PI, 0.7);
+    limb(part(root, "box", vec3(0.17, -0.35, 0.38), vec3(0.13, 0.45, 0.13), fur), 0, 0.7);
+}
+
+// Kobold: hunched rat-folk with a candle on the head. The root sits 0.6 m up.
+void kobold(Entity root, color fur, bool boss) {
+    part(root, "ico", vec3(0, 0.05, 0.05), vec3(0.62, 0.72, 0.5), fur);
+    part(root, "ico", vec3(0, 0.5, -0.12), vec3(0.5, 0.44, 0.52), fur);
+    part(root, "ico", vec3(0, 0.44, -0.42), vec3(0.24, 0.2, 0.3), fur * 0.85);
+    part(root, "sphere", vec3(0, 0.46, -0.58), vec3(0.08, 0.08, 0.08), color("#2a1a1a"));
+    part(root, "cone", vec3(-0.22, 0.78, -0.08), vec3(0.18, 0.32, 0.12), fur);
+    part(root, "cone", vec3(0.22, 0.78, -0.08), vec3(0.18, 0.32, 0.12), fur);
+    Entity eye = part(root, "sphere", vec3(-0.1, 0.56, -0.36), vec3(0.07, 0.07, 0.07), boss ? color("#ff4d3d") : color("#ffe38a"));
+    get<Mesh>(eye).emissive = 2;
+    eye = part(root, "sphere", vec3(0.1, 0.56, -0.36), vec3(0.07, 0.07, 0.07), boss ? color("#ff4d3d") : color("#ffe38a"));
+    get<Mesh>(eye).emissive = 2;
+    limb(part(root, "box", vec3(-0.15, -0.42, 0.05), vec3(0.15, 0.36, 0.17), fur * 0.8), 0, 0.7);
+    limb(part(root, "box", vec3(0.15, -0.42, 0.05), vec3(0.15, 0.36, 0.17), fur * 0.8), PI, 0.7);
+    limb(part(root, "box", vec3(-0.36, 0.1, -0.05), vec3(0.12, 0.42, 0.13), fur), PI, 0.5);
+    limb(part(root, "box", vec3(0.36, 0.1, -0.05), vec3(0.12, 0.42, 0.13), fur), 0, 0.5);
+    // The candle every kobold guards with its life.
+    part(root, "cylinder", vec3(0, 0.84, -0.08), vec3(0.09, 0.2, 0.09), color("#f3ead2"));
+    Entity flame = part(root, "ico", vec3(0, 0.99, -0.08), vec3(0.09, 0.14, 0.09), color("#ffb43f"));
+    get<Mesh>(flame).emissive = 3;
+    // Pick, or a big club for the boss.
+    Entity w = spawn("Pivot", Transform3D { position = vec3(0.4, 0.05, -0.2) }, Weapon {}, Parent { entity = root });
+    part(w, "cylinder", vec3(0, 0.3, 0), vec3(0.05, 0.7, 0.05), color("#7a5a3a"));
+    if (boss) part(w, "ico", vec3(0, 0.65, 0), vec3(0.3, 0.4, 0.3), color("#5a4a3a"));
+    else part(w, "box", vec3(0, 0.62, -0.05), vec3(0.45, 0.07, 0.07), color("#9aa0a8"));
+}
+
+// House with a gable roof (45 degrees). p is the ground center; the root is the walls.
+Entity house(vec3 p, float w, float d, float h, float yaw, color wall, color roof) {
+    Entity b = spawn("Part", Transform3D { position = p + vec3(0, h / 2, 0), rotation = euler(0, yaw, 0) },
+        Mesh { shape = "box", size = vec3(w, h, d), color = wall }, Collider { size = vec3(w, h, d) });
+    float s = w * 0.7071;
+    Entity gable = part(b, "box", vec3(0, h / 2, 0), vec3(s, s, d - 0.02), wall);
+    get<Transform3D>(gable).rotation = euler(0, 0, PI / 4);
+    Entity l = part(b, "box", vec3(-w / 4 - 0.07, h / 2 + w / 4 + 0.07, 0), vec3(s + 0.5, 0.18, d + 0.5), roof);
+    get<Transform3D>(l).rotation = euler(0, 0, PI / 4);
+    Entity r = part(b, "box", vec3(w / 4 + 0.07, h / 2 + w / 4 + 0.07, 0), vec3(s + 0.5, 0.18, d + 0.5), roof);
+    get<Transform3D>(r).rotation = euler(0, 0, -PI / 4);
+    part(b, "box", vec3(0, -h / 2 + 1.1, -d / 2 - 0.02), vec3(1.2, 2.2, 0.08), color("#5b3b22"));
+    for (int i = -1; i <= 1; i += 2) {
+        Entity win = part(b, "box", vec3(i * w / 4, 0.4, -d / 2 - 0.02), vec3(0.8, 0.8, 0.06), color("#ffd98a"));
+        get<Mesh>(win).emissive = 0.6;
+    }
+    // Timber frame.
+    part(b, "box", vec3(0, h / 2 - 0.1, -d / 2 - 0.03), vec3(w, 0.2, 0.06), color("#5b3b22"));
+    part(b, "box", vec3(-w / 2 + 0.1, 0, -d / 2 - 0.03), vec3(0.2, h, 0.06), color("#5b3b22"));
+    part(b, "box", vec3(w / 2 - 0.1, 0, -d / 2 - 0.03), vec3(0.2, h, 0.06), color("#5b3b22"));
+    return b;
+}
+
+// Round tower with a cone roof.
+void tower(vec3 p, float r, float h, color wall, color roof) {
+    Entity t = spawn("Part", Transform3D { position = p + vec3(0, h / 2, 0) },
+        Mesh { shape = "cylinder", size = vec3(r * 2, h, r * 2), color = wall }, Collider { size = vec3(r * 1.6, h, r * 1.6) });
+    part(t, "cone", vec3(0, h / 2 + r * 0.9, 0), vec3(r * 2.5, r * 1.8, r * 2.5), roof);
+    Entity win = part(t, "box", vec3(0, h / 4, -r + 0.05), vec3(0.4, 0.9, 0.1), color("#ffd98a"));
+    get<Mesh>(win).emissive = 0.6;
+}
+
+void oak(vec3 p, float s) {
+    Entity t = spawn("Part", Transform3D { position = p + vec3(0, 1.6 * s, 0), scale = vec3(s, s, s), rotation = euler(0, random(0, PI * 2), 0) },
+        Mesh { shape = "cylinder", size = vec3(0.55, 3.2, 0.55), color = color("#5a3f2a") }, Collider { size = vec3(0.5 * s, 3.2 * s, 0.5 * s) });
+    color a = random() < 0.5 ? color("#4f8f3a") : color("#3f7f3f");
+    color b = random() < 0.5 ? color("#6aa84f") : color("#5c9a45");
+    part(t, "ico", vec3(0, 2.2, 0), vec3(3.4, 2.8, 3.4), a);
+    part(t, "ico", vec3(1.2, 1.5, 0.4), vec3(2.2, 1.8, 2.2), b);
+    part(t, "ico", vec3(-1.1, 1.7, -0.5), vec3(2.3, 2, 2.3), a);
+    part(t, "ico", vec3(0.2, 3.2, 0.1), vec3(2, 1.6, 2), b);
+}
+
+void pine(vec3 p, float s) {
+    Entity t = spawn("Part", Transform3D { position = p + vec3(0, 1 * s, 0), scale = vec3(s, s, s) },
+        Mesh { shape = "cylinder", size = vec3(0.4, 2, 0.4), color = color("#5a3f2a") }, Collider { size = vec3(0.4 * s, 2 * s, 0.4 * s) });
+    for (int i = 0; i < 4; i++) {
+        Entity l = part(t, "cone", vec3(0, 0.9 + i * 1.05, 0), vec3(3.2 - i * 0.65, 1.9, 3.2 - i * 0.65), i % 2 == 0 ? color("#2f6b3f") : color("#275a36"));
+        get<Transform3D>(l).rotation = euler(0, random(0, PI), 0);
+    }
+}
+
+void rock(vec3 p, float s, color c) {
+    spawn("Part", Transform3D { position = p + vec3(0, 0.2 * s, 0), scale = vec3(s, s * random(0.5, 0.9), s), rotation = euler(0, random(0, PI), 0) },
+        Mesh { shape = "ico", size = vec3(1.2, 1, 1), color = c, roughness = 1 }, Collider { shape = "sphere", size = vec3(s, s, s) });
+}

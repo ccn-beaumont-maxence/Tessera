@@ -262,6 +262,30 @@ system Q(Tint t, Out& o) {
     expect(out.l).toBeCloseTo(2);
   });
 
+  it('scales color rgb and keeps alpha', async () => {
+    const m = await load(`
+resource Out { color a; color b; color c; color d; }
+system S(Out& o) {
+    o.a = color(1, 1, 1, 0.5) * 0.8;
+    o.b = 0.5 * color(1, 1, 1, 1) + color(0.1, 0.1, 0.1, 0.2);
+    o.c = color(1, 1, 1, 1) / 2;
+    o.d = color(1, 1, 1, 1);
+    o.d *= 0.25;
+    o.d -= color(0.25, 0, 0, 0.5);
+}
+`);
+    const w = new World();
+    w.addSystem(sys(m, 'S'));
+    w.step();
+    const o = w.resourceList()[0]?.[1] as Record<string, { r: number; a: number }>;
+    expect(o.a?.r).toBeCloseTo(0.8);
+    expect(o.a?.a).toBe(0.5);
+    expect(o.b?.r).toBeCloseTo(0.6);
+    expect(o.b?.a).toBe(1);
+    expect(o.c).toMatchObject({ r: 0.5, a: 1 });
+    expect(o.d).toMatchObject({ r: 0, a: 1 });
+  });
+
   it('reads raycast hits and loops over overlaps', async () => {
     const m = await load(`
 resource Probe { vec2 point; vec2 normal; float distance; Entity hit; int near; }

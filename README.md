@@ -12,6 +12,14 @@ materials with bloom and fog, particles, point lights, hierarchy, physics, HUD a
 
 [![The Whispering Wood](docs/forest.png)](https://beaumont-maxence.github.io/tessera/)
 
+**[Play Dawnvale](https://beaumont-maxence.github.io/tessera/dawnvale/)**: a small MMO-style
+starting valley. Six chained quests (slay, loot, gather, deliver, a boss) take you from level 1
+to 6; Tab or click to target, auto-attack, `1` to Strike, `F` to talk. Quests, people and mob
+camps are data in [scene.yaml](examples/dawnvale/scene.yaml); the rules are split by feature
+into [Tess files](examples/dawnvale) (world, combat, quests, HUD).
+
+[![Dawnvale](docs/dawnvale.png)](https://beaumont-maxence.github.io/tessera/dawnvale/)
+
 ```sh
 pnpm install
 pnpm dev                                    # examples in the browser (YAML edits hot-reload)

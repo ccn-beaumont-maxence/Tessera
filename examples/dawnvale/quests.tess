@@ -1,0 +1,94 @@
+// Quests are entities in scene.yaml. This file unlocks them, hands them out, counts progress
+// and shows ! and ? over the people who have something for you.
+using "./common.tess";
+
+bool finished(int order) {
+    bool done = true;
+    for (Quest q : query) if (q.order == order) done = q.state == DONE;
+    return done;
+}
+
+string labelOf(string id) {
+    string label = id;
+    for (Npc n : query) if (n.id == id) label = n.label;
+    return label;
+}
+
+system Unlock(Quest& q) {
+    if (q.state == LOCKED && (q.requires == 0 || finished(q.requires))) q.state = AVAILABLE;
+}
+
+void progress(Quest& q, Msg& msg, string what) {
+    q.have++;
+    say(msg, what + " " + q.have + "/" + q.need);
+    if (q.have >= q.need) {
+        q.state = READY;
+        say(msg, q.title + " complete!\nReturn to " + labelOf(q.turnIn) + ".");
+    }
+}
+
+system Credit(Quest& q, Msg& msg) {
+    if (q.state != ACTIVE) return;
+    for (Killed k : events<Killed>()) {
+        if (q.target != k.kind || q.state != ACTIVE) continue;
+        if (q.goal == "kill") progress(q, msg, q.item);
+        else if (q.goal == "loot" && random() < q.chance) progress(q, msg, q.item);
+    }
+}
+
+// F: talk to the nearest person (turn in first, then take one new quest), or gather.
+system Use(Entity e, Hero h, Transform3D t, Msg& msg) {
+    if (!pressed("use") || h.dead > 0) return;
+    bool done = false;
+    for (Entity n, Npc npc, Transform3D nt : query) {
+        if (done || dist(nt.position, t.position) > 4) continue;
+        done = true;
+        bool spoke = false;
+        for (Quest& q : query)
+            if (!spoke && q.turnIn == npc.id && q.state == READY) {
+                spoke = true;
+                q.state = DONE;
+                emit(Reward { xp = q.xp });
+                say(msg, npc.label + ": " + q.done + "\n[" + q.title + " completed: +" + q.xp + " xp]");
+            }
+        for (Quest& q : query)
+            if (!spoke && q.giver == npc.id && q.state == AVAILABLE) {
+                spoke = true;
+                q.state = q.goal == "talk" ? READY : ACTIVE;
+                say(msg, q.title + "\n" + q.text);
+            }
+        if (!spoke) say(msg, npc.label + ": Light be with you, friend.");
+    }
+    for (Entity p, Pickup& pick, Transform3D pt : query) {
+        if (done || pick.gone > 0 || dist(pt.position, t.position) > 2.5) continue;
+        done = true;
+        bool used = false;
+        for (Quest& q : query)
+            if (!used && q.goal == "gather" && q.target == pick.item && q.state == ACTIVE) {
+                used = true;
+                pick.gone = 25;
+                spawn("Sparkle", Transform3D { position = pt.position });
+                progress(q, msg, q.item);
+            }
+        if (!used) say(msg, "You have no use for that yet.");
+    }
+}
+
+system Regrow(Pickup& p, Transform3D& t) {
+    p.gone = max(p.gone - dt, 0);
+    t.position = p.gone > 0 ? p.home + vec3(0, -60, 0) : p.home;
+}
+
+// ! = a quest to take, ? = a quest to hand in (grey while still in progress).
+system Markers(Marker m, Text& text) {
+    bool ready = false;
+    bool offer = false;
+    bool waiting = false;
+    for (Quest q : query) {
+        ready = ready || (q.turnIn == m.npc && q.state == READY);
+        offer = offer || (q.giver == m.npc && q.state == AVAILABLE);
+        waiting = waiting || (q.turnIn == m.npc && q.state == ACTIVE);
+    }
+    text.text = ready ? "?" : offer ? "!" : waiting ? "?" : "";
+    text.color = ready || offer ? color("#ffd23f") : color("#a0a0a0");
+}

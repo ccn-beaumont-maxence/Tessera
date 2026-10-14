@@ -59,6 +59,8 @@ export interface CompileResult {
 const ASSET = /\.(png|jpe?g|webp|gif|svg|gltf|glb|mp3|ogg|wav|m4a)"$/i;
 const isPure = (js: string) => /^-?[\w$.]+$/.test(js);
 const isValue = (ty: string) => ty in VALUE;
+/** Math on a color keeps alpha (component 3) from the (left) color operand. */
+const alpha = (ty: string, i: number) => ty === 'color' && i === 3;
 const isNum = (ty: string) => ty === 'float' || ty === 'int';
 const MATH1 = ['abs', 'floor', 'ceil', 'round', 'sqrt', 'sin', 'cos', 'tan'];
 const MATH2 = ['pow', 'atan2', 'min', 'max'];
@@ -734,10 +736,14 @@ class Compiler {
     } else if (e.op === '+=' || e.op === '-=') {
       this.expectType(v, t.ty, e.value);
       const op = e.op[0];
-      comps = this.comps(v, b).map((c, i) => `$o.${keys[i]} ${op} ${c}`);
+      comps = this.comps(v, b).map((c, i) =>
+        alpha(t.ty, i) ? `$o.a` : `$o.${keys[i]} ${op} ${c}`,
+      );
     } else if ((e.op === '*=' || e.op === '/=') && isNum(v.ty)) {
       const s = this.repeatable(v.js, b);
-      comps = keys.map((k, i) => `$o.${k} ${e.op[0]} ${i === 0 ? s.first : s.ref}`);
+      comps = keys.map((k, i) =>
+        alpha(t.ty, i) ? `$o.a` : `$o.${k} ${e.op[0]} ${i === 0 ? s.first : s.ref}`,
+      );
     } else {
       return this.fail(`${t.ty} ${e.op} ${v.ty} is not supported`, e);
     }
@@ -871,7 +877,7 @@ class Compiler {
         if (isValue(v.ty) && e.op === '-')
           return this.valueR(
             v.ty,
-            this.comps(v, b).map((c) => `-${c}`),
+            this.comps(v, b).map((c, i) => (alpha(v.ty, i) ? c : `-${c}`)),
           );
         if (!isNum(v.ty)) this.fail(`${e.op} needs a number, got ${v.ty}`, e);
         return { ty: v.ty, js: `${e.op}${v.js}` };
@@ -1007,7 +1013,7 @@ class Compiler {
       const rc = this.comps(r, b);
       return this.valueR(
         l.ty,
-        this.comps(l, b).map((c, i) => `(${c} ${op} ${rc[i]})`),
+        this.comps(l, b).map((c, i) => (alpha(l.ty, i) ? c : `(${c} ${op} ${rc[i]})`)),
       );
     }
     if (isValue(l.ty) && isNum(r.ty) && (op === '*' || op === '/')) {
@@ -1015,14 +1021,16 @@ class Compiler {
       const s = this.repeatable(r.js, b);
       return this.valueR(
         l.ty,
-        lc.map((c, i) => `(${c} ${op} ${i === 0 ? s.first : s.ref})`),
+        lc.map((c, i) => (alpha(l.ty, i) ? c : `(${c} ${op} ${i === 0 ? s.first : s.ref})`)),
       );
     }
     if (isNum(l.ty) && isValue(r.ty) && op === '*') {
       const s = this.repeatable(l.js, b);
       return this.valueR(
         r.ty,
-        this.comps(r, b).map((c, i) => `(${i === 0 ? s.first : s.ref} * ${c})`),
+        this.comps(r, b).map((c, i) =>
+          alpha(r.ty, i) ? c : `(${i === 0 ? s.first : s.ref} * ${c})`,
+        ),
       );
     }
     return this.fail(`${l.ty} ${op} ${r.ty} is not supported`, e);
