@@ -1,11 +1,11 @@
-import { component, mut, resource, system, Transform2D, World } from '@tessera/core';
+import { component, mut, Parent, resource, system, Transform2D, World } from '@tessera/core';
 import { dump, find } from '@tessera/headless';
 import { isDown, press } from '@tessera/input';
 import { RigidBody } from '@tessera/physics';
 import { Sprite } from '@tessera/render';
 import { describe, expect, it } from 'vitest';
 import { parseScene, type SceneIO } from './parse';
-import { build, reload, sceneGame, spawnPrefab } from './scene';
+import { build, currentScene, loadScene, reload, sceneGame, spawnPrefab } from './scene';
 
 const Speed = component('Speed', () => ({ value: 1 }));
 const Score = resource('Score', () => ({ value: 0, best: 0 }));
@@ -209,6 +209,69 @@ entities:
     ).toBe(false);
     expect(() => reload(new World(), {} as never)).toThrow('needs a world built by build()');
     void io;
+  });
+
+  it('links children to their parent and reloads them', async () => {
+    const scene = `dimension: 2d
+entities:
+  - name: Ship
+    Transform2D: { position: [5, 0] }
+    children:
+      - name: Gun
+        Transform2D: { position: [1, 0] }
+        children: [{ Transform2D: {} }]
+`;
+    const { w } = await load({ '/game/scene.yaml': scene });
+    const ship = find(w, 'Ship');
+    const gun = find(w, 'Gun');
+    expect(w.get(gun, Parent)?.entity).toBe(ship);
+    expect(dump(w)).toContain(`Parent{entity:${gun}}`);
+    const edited = scene.replace('[1, 0]', '[2, 0]');
+    expect(
+      reload(
+        w,
+        await parseScene('/game/scene.yaml', memoryIO({ ...files, '/game/scene.yaml': edited })),
+      ),
+    ).toBe(true);
+    expect(w.get(gun, Transform2D)?.position.x).toBe(2);
+    const bad = 'dimension: 2d\nentities:\n  - name: A\n    children: 3\n';
+    await expect(load({ '/game/scene.yaml': bad })).rejects.toThrow(
+      'scene.yaml:4: children must be a list',
+    );
+  });
+
+  it('switches scenes at the end of the step, keeping chosen resources', async () => {
+    const level2 =
+      'dimension: 2d\nscripts: [./game.ts]\nsystems: [Walk]\nentities:\n  - { name: Boss, Transform2D: {}, Speed: {} }\n';
+    const { w } = await load({
+      '/game/scene.yaml': SCENE.replace(
+        'systems: [Walk]',
+        'scenes: [./level2.yaml]\nsystems: [Walk]',
+      ),
+      '/game/level2.yaml': level2,
+    });
+    w.resource(Score).value = 7;
+    loadScene(w, 'level2.yaml', [Score]);
+    expect(find(w, 'Hero')).toBeGreaterThan(0);
+    w.step();
+    expect(() => find(w, 'Hero')).toThrow();
+    expect(currentScene(w)).toBe('/game/level2.yaml');
+    expect(w.resource(Score).value).toBe(7);
+    w.step();
+    expect(w.get(find(w, 'Boss'), Transform2D)?.position.x).toBeCloseTo(1 / 60);
+    loadScene(w, './scene.yaml');
+    w.step();
+    expect(w.resource(Score)).toEqual({ value: 0, best: 10 });
+    expect(find(w, 'Hero')).toBeGreaterThan(0);
+    expect(() => loadScene(w, 'nope.yaml')).toThrow(
+      'loadScene("nope.yaml"): unknown scene; list it under `scenes:` in the first scene (loaded: scene.yaml, level2.yaml)',
+    );
+    await expect(
+      load({
+        '/game/scene.yaml': 'dimension: 2d\nscenes: [./b.yaml]\n',
+        '/game/b.yaml': 'dimension: 3d\n',
+      }),
+    ).rejects.toThrow('scene.yaml:2: /game/b.yaml is 3d, scenes must all be 2d');
   });
 
   it('spawns prefabs at runtime with overrides', async () => {

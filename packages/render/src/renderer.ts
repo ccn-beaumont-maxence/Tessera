@@ -1,9 +1,20 @@
 import { loaded, loadModel, loadTexture } from '@tessera/assets';
 import {
   type Color,
+  compose2D,
+  compose3D,
+  type DeepReadonly,
   type Entity,
+  PARTICLE_STRIDE,
+  Particles,
+  type Pose2D,
+  type Pose3D,
+  parentOf,
+  particlesOf,
   type Quat,
   quat,
+  Tilemap,
+  type TilemapData,
   Transform2D,
   Transform3D,
   type Vec3,
@@ -11,7 +22,8 @@ import {
   type World,
 } from '@tessera/core';
 import * as THREE from 'three';
-import { Camera2D, Camera3D, Light, Mesh, Sprite } from './components';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { Animator, Camera2D, Camera3D, Light, Mesh, Sprite, Text } from './components';
 
 interface Prev {
   p: Vec3;
@@ -28,6 +40,93 @@ interface SpriteNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasi
   /** Frame size in pixels once the image is loaded. */
   px: { w: number; h: number } | null;
 }
+/** glTF animation state, kept in the model group's userData. */
+interface ModelData {
+  mixer: THREE.AnimationMixer;
+  clips: THREE.AnimationClip[];
+  /** Clip currently bound (null = none yet). */
+  clip: string | null;
+  action: THREE.AnimationAction | null;
+}
+
+interface TilemapNode extends Node<THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>> {
+  /** Inputs of the current geometry: rebuilt when one changes. */
+  tiles: readonly string[];
+  size: number;
+  chars: string;
+  columns: number;
+  rows: number;
+}
+
+/** One quad per drawn tile, top-left corner at the origin, UVs picking spritesheet frames. */
+function tileGeometry(t: DeepReadonly<TilemapData>): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const index: number[] = [];
+  const s = t.size;
+  for (const [r, row] of t.tiles.entries()) {
+    for (let c = 0; c < row.length; c++) {
+      const f = t.chars.indexOf(row[c] as string);
+      if (f < 0) continue;
+      const fc = f % t.columns;
+      const fr = Math.floor(f / t.columns) % t.rows;
+      const u0 = fc / t.columns;
+      const u1 = (fc + 1) / t.columns;
+      const v0 = 1 - (fr + 1) / t.rows;
+      const v1 = 1 - fr / t.rows;
+      const i = pos.length / 3;
+      pos.push(c * s, -(r + 1) * s, 0, (c + 1) * s, -(r + 1) * s, 0);
+      pos.push((c + 1) * s, -r * s, 0, c * s, -r * s, 0);
+      uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+      index.push(i, i + 1, i + 2, i, i + 2, i + 3);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(index);
+  return g;
+}
+
+interface ParticleNode
+  extends Node<THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>> {
+  max: number;
+}
+
+interface TextNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>> {
+  canvas: HTMLCanvasElement;
+  align: string;
+  /** Width / height of the drawn text block, and its line count. */
+  aspect: number;
+  lines: number;
+}
+
+/** Canvas pixels per text line. */
+const LINE_PX = 64;
+
+function canvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  return map;
+}
+
+/** Rasterizes white text (tinted by the material); returns width/height and line count. */
+function drawText(canvas: HTMLCanvasElement, text: string, align: string) {
+  const lines = text.split('\n');
+  const font = `bold ${LINE_PX * 0.8}px sans-serif`;
+  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+  ctx.font = font;
+  const w = Math.ceil(Math.max(1, ...lines.map((l) => ctx.measureText(l).width))) + 4;
+  canvas.width = w;
+  canvas.height = LINE_PX * lines.length;
+  ctx.font = font; // resizing resets the context state
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+  const x = align === 'left' ? 2 : align === 'right' ? w - 2 : w / 2;
+  for (const [i, l] of lines.entries()) ctx.fillText(l, x, LINE_PX * (i + 0.5));
+  return { aspect: w / canvas.height, lines: lines.length };
+}
 
 const UNIT: Record<string, () => THREE.BufferGeometry> = {
   box: () => new THREE.BoxGeometry(1, 1, 1),
@@ -36,6 +135,8 @@ const UNIT: Record<string, () => THREE.BufferGeometry> = {
   capsule: () => new THREE.CapsuleGeometry(0.5, 1, 8, 16),
   cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
 };
+
+const ORIGIN2 = Transform2D.create();
 
 const setColor = (target: THREE.Color, c: Color) =>
   target.setRGB(c.r, c.g, c.b, THREE.SRGBColorSpace);
@@ -53,9 +154,19 @@ export class Renderer {
   private readonly meshes = new Map<Entity, Node<THREE.Object3D>>();
   private readonly sprites = new Map<Entity, SpriteNode>();
   private readonly lights = new Map<Entity, Node<THREE.Light>>();
+  private readonly texts = new Map<Entity, TextNode>();
+  private readonly tilemaps = new Map<Entity, TilemapNode>();
+  private readonly particles = new Map<Entity, ParticleNode>();
+  private readonly dummy = new THREE.Object3D();
+  private readonly tint = new THREE.Color();
+  /** Screen-space overlay (Text with `screen: true`), drawn after the scene. */
+  private readonly hud = new THREE.Scene();
+  private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   private stamp = 0;
-  private readonly p = vec3();
-  private readonly q = quat();
+  private readonly w2 = Transform2D.create();
+  private readonly up2 = Transform2D.create();
+  private readonly w3 = Transform3D.create();
+  private readonly up3 = Transform3D.create();
   private readonly size = new THREE.Vector2();
 
   constructor(
@@ -103,8 +214,18 @@ export class Renderer {
     this.resize();
     this.syncMeshes(alpha);
     this.syncSprites(alpha);
+    this.syncTilemaps(alpha);
     this.syncLights(alpha);
-    this.gl.render(this.scene, this.camera(alpha));
+    this.syncTexts(alpha);
+    const camera = this.camera(alpha);
+    this.syncParticles(camera);
+    this.gl.render(this.scene, camera);
+    if (this.hud.children.length > 0) {
+      this.gl.autoClear = false;
+      this.gl.clearDepth();
+      this.gl.render(this.hud, this.hudCamera);
+      this.gl.autoClear = true;
+    }
   }
 
   dispose(): void {
@@ -120,17 +241,65 @@ export class Renderer {
     return s;
   }
 
-  private place3(
-    e: Entity,
-    t: { position: Vec3; rotation: Quat },
-    alpha: number,
-    o: THREE.Object3D,
-  ) {
+  /** `e`'s transform interpolated from the last capture, into `out`. */
+  private local3(e: Entity, t: Pose3D, alpha: number, out: Pose3D): Pose3D {
     const s = alpha < 1 ? this.prev.get(e) : undefined;
-    const p = s ? vec3.lerp(s.p, t.position, alpha, this.p) : t.position;
-    const q = s ? quat.slerp(s.q, t.rotation, alpha, this.q) : t.rotation;
-    o.position.set(p.x, p.y, p.z);
-    o.quaternion.set(q.x, q.y, q.z, q.w);
+    if (s) {
+      vec3.lerp(s.p, t.position, alpha, out.position);
+      quat.slerp(s.q, t.rotation, alpha, out.rotation);
+    } else {
+      vec3.copy(t.position, out.position);
+      quat.copy(t.rotation, out.rotation);
+    }
+    vec3.copy(t.scale, out.scale);
+    return out;
+  }
+
+  private local2(e: Entity, t: Pose2D, alpha: number, out: Pose2D): Pose2D {
+    const s = alpha < 1 ? this.prev.get(e) : undefined;
+    out.position.x = s ? s.p.x + (t.position.x - s.p.x) * alpha : t.position.x;
+    out.position.y = s ? s.p.y + (t.position.y - s.p.y) * alpha : t.position.y;
+    out.rotation = s ? s.a + (t.rotation - s.a) * alpha : t.rotation;
+    out.scale.x = t.scale.x;
+    out.scale.y = t.scale.y;
+    return out;
+  }
+
+  /** Interpolated world pose (Parent chain applied); shared scratch, use before the next call. */
+  private pose3(e: Entity, t: Pose3D, alpha: number): Pose3D {
+    const out = this.local3(e, t, alpha, this.w3);
+    for (let p = parentOf(this.world, e, Transform3D), d = 0; p && d < 64; d++) {
+      const pt = this.world.get(p, Transform3D) as Pose3D;
+      compose3D(this.local3(p, pt, alpha, this.up3), out, out);
+      p = parentOf(this.world, p, Transform3D);
+    }
+    return out;
+  }
+
+  private pose2(e: Entity, t: Pose2D, alpha: number): Pose2D {
+    const out = this.local2(e, t, alpha, this.w2);
+    for (let p = parentOf(this.world, e, Transform2D), d = 0; p && d < 64; d++) {
+      const pt = this.world.get(p, Transform2D) as Pose2D;
+      compose2D(this.local2(p, pt, alpha, this.up2), out, out);
+      p = parentOf(this.world, p, Transform2D);
+    }
+    return out;
+  }
+
+  private place3(e: Entity, t: Pose3D, alpha: number, o: THREE.Object3D): Pose3D {
+    const w = this.pose3(e, t, alpha);
+    o.position.set(w.position.x, w.position.y, w.position.z);
+    o.quaternion.set(w.rotation.x, w.rotation.y, w.rotation.z, w.rotation.w);
+    return w;
+  }
+
+  /** 2D pose; `layer` sets draw order (and a tiny z so equal layers still sort). */
+  private place2(e: Entity, t: Pose2D, alpha: number, o: THREE.Object3D, layer: number): Pose2D {
+    const w = this.pose2(e, t, alpha);
+    o.position.set(w.position.x, w.position.y, layer * 0.01);
+    o.rotation.set(0, 0, w.rotation);
+    o.renderOrder = layer;
+    return w;
   }
 
   private syncMeshes(alpha: number): void {
@@ -156,10 +325,30 @@ export class Renderer {
         mat.roughness = m.roughness;
         mat.metalness = m.metalness;
       }
-      this.place3(e, t, alpha, n.obj);
-      n.obj.scale.set(t.scale.x * m.size.x, t.scale.y * m.size.y, t.scale.z * m.size.z);
+      const { scale } = this.place3(e, t, alpha, n.obj);
+      n.obj.scale.set(scale.x * m.size.x, scale.y * m.size.y, scale.z * m.size.z);
+      const anim = this.world.get(e, Animator);
+      if (anim && 'mixer' in n.obj.userData) this.pose(n.obj.userData as ModelData, anim, m.model);
     });
     this.sweep(this.meshes);
+  }
+
+  /** Applies the Animator's clip at its time (no mixer clock: the simulation drives it). */
+  private pose(u: ModelData, a: { clip: string; loop: boolean; time: number }, url: string) {
+    if (u.clip !== a.clip) {
+      u.clip = a.clip;
+      u.mixer.stopAllAction();
+      const clip = a.clip ? u.clips.find((c) => c.name === a.clip) : u.clips[0];
+      if (!clip) {
+        const names = u.clips.map((c) => c.name).join(', ');
+        console.error(`Animator: ${url} has no clip "${a.clip}" (clips: ${names})`);
+      }
+      u.action = clip ? u.mixer.clipAction(clip).play() : null;
+    }
+    if (!u.action) return;
+    const d = u.action.getClip().duration || 1;
+    u.action.time = a.loop ? ((a.time % d) + d) % d : Math.min(Math.max(a.time, 0), d);
+    u.mixer.update(0);
   }
 
   /** Group that receives a clone of the glTF scene once loaded. */
@@ -167,7 +356,17 @@ export class Renderer {
     const group = new THREE.Group();
     loadModel(url).then(
       (gltf) => {
-        const scene = gltf.scene.clone(true);
+        // SkeletonUtils keeps skinned meshes bound to their own cloned bones.
+        const scene = cloneSkinned(gltf.scene);
+        if (gltf.animations.length > 0) {
+          const model: ModelData = {
+            mixer: new THREE.AnimationMixer(scene),
+            clips: gltf.animations,
+            clip: null,
+            action: null,
+          };
+          group.userData = model;
+        }
         scene.traverse((o) => {
           o.castShadow = o.receiveShadow = true;
         });
@@ -224,16 +423,155 @@ export class Renderer {
         tex.repeat.set(1 / s.columns, 1 / s.rows);
         tex.offset.set(col / s.columns, 1 - (row + 1) / s.rows);
       }
-      const prev = alpha < 1 ? this.prev.get(e) : undefined;
-      const x = prev ? prev.p.x + (t.position.x - prev.p.x) * alpha : t.position.x;
-      const y = prev ? prev.p.y + (t.position.y - prev.p.y) * alpha : t.position.y;
-      const a = prev ? prev.a + (t.rotation - prev.a) * alpha : t.rotation;
-      obj.position.set(x, y, s.layer * 0.01);
-      obj.rotation.set(0, 0, a);
-      obj.renderOrder = s.layer;
-      obj.scale.set(w * t.scale.x * (s.flipX ? -1 : 1), h * t.scale.y, 1);
+      const { scale } = this.place2(e, t, alpha, obj, s.layer);
+      obj.scale.set(w * scale.x * (s.flipX ? -1 : 1), h * scale.y, 1);
     });
     this.sweep(this.sprites);
+  }
+
+  private syncTilemaps(alpha: number): void {
+    this.world.each([Transform2D, Tilemap], (e, t, m) => {
+      let n = this.tilemaps.get(e);
+      if (!n || n.key !== m.image) {
+        if (n) this.drop(n);
+        const mat = new THREE.MeshBasicMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const obj = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+        this.scene.add(obj);
+        if (m.image) {
+          obj.visible = false;
+          loadTexture(m.image).then(
+            (base) => {
+              mat.map = base.clone();
+              mat.map.needsUpdate = true;
+              mat.needsUpdate = true;
+              obj.visible = true;
+            },
+            (err: unknown) => console.error(`Tilemap.image: ${String(err)}`),
+          );
+        }
+        n = { obj, key: m.image, stamp: 0, tiles: [], size: 0, chars: '', columns: 0, rows: 0 };
+        this.tilemaps.set(e, n);
+      }
+      n.stamp = this.stamp;
+      if (
+        n.tiles !== m.tiles ||
+        n.size !== m.size ||
+        n.chars !== m.chars ||
+        n.columns !== m.columns ||
+        n.rows !== m.rows
+      ) {
+        n.obj.geometry.dispose();
+        n.obj.geometry = tileGeometry(m);
+        Object.assign(n, { tiles: m.tiles, size: m.size, chars: m.chars });
+        Object.assign(n, { columns: m.columns, rows: m.rows });
+      }
+      setColor(n.obj.material.color, m.color);
+      n.obj.material.opacity = m.color.a;
+      const { scale } = this.place2(e, t, alpha, n.obj, m.layer);
+      n.obj.scale.set(scale.x, scale.y, 1);
+    });
+    this.sweep(this.tilemaps);
+  }
+
+  /** Particles are camera-facing quads; size and color blend over their life. */
+  private syncParticles(camera: THREE.Camera): void {
+    this.world.each([Particles], (e, p) => {
+      const pool = particlesOf(this.world, e);
+      let n = this.particles.get(e);
+      if (!n || n.max !== p.max) {
+        if (n) this.drop(n);
+        const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
+        const obj = new THREE.InstancedMesh(this.spriteGeometry, mat, p.max);
+        obj.frustumCulled = false;
+        this.scene.add(obj);
+        n = { obj, key: '', stamp: 0, max: p.max };
+        this.particles.set(e, n);
+      }
+      n.stamp = this.stamp;
+      const { obj } = n;
+      obj.count = pool?.count ?? 0;
+      obj.material.opacity = p.color.a;
+      const d = this.dummy;
+      d.quaternion.copy(camera.quaternion);
+      const data = pool?.data;
+      for (let i = 0; data && i < obj.count; i++) {
+        const o = i * PARTICLE_STRIDE;
+        const k = Math.min((data[o + 6] as number) / p.lifetime, 1);
+        d.position.set(data[o] as number, data[o + 1] as number, data[o + 2] as number);
+        d.scale.setScalar(Math.max(p.size + (p.endSize - p.size) * k, 1e-4));
+        d.updateMatrix();
+        obj.setMatrixAt(i, d.matrix);
+        const c = p.color;
+        const f = p.endColor;
+        this.tint.setRGB(
+          c.r + (f.r - c.r) * k,
+          c.g + (f.g - c.g) * k,
+          c.b + (f.b - c.b) * k,
+          THREE.SRGBColorSpace,
+        );
+        obj.setColorAt(i, this.tint);
+      }
+      obj.instanceMatrix.needsUpdate = true;
+      if (obj.instanceColor) obj.instanceColor.needsUpdate = true;
+    });
+    this.sweep(this.particles);
+  }
+
+  private syncTexts(alpha: number): void {
+    const { width, height } = this.gl.domElement;
+    const aspect = width / Math.max(height, 1);
+    this.world.each([Text], (e, t) => {
+      let n = this.texts.get(e);
+      if (!n) {
+        const canvas = document.createElement('canvas');
+        const mat = new THREE.MeshBasicMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        const obj = new THREE.Mesh(this.spriteGeometry, mat);
+        n = { obj, key: '', stamp: 0, canvas, align: '', aspect: 1, lines: 1 };
+        this.texts.set(e, n);
+      }
+      n.stamp = this.stamp;
+      const { obj } = n;
+      const parent = t.screen ? this.hud : this.scene;
+      if (obj.parent !== parent) parent.add(obj);
+      if (n.key !== t.text || n.align !== t.align) {
+        Object.assign(n, drawText(n.canvas, t.text, t.align));
+        n.key = t.text;
+        n.align = t.align;
+        // A resized canvas needs a new GPU texture: three.js cannot grow one in place.
+        obj.material.map?.dispose();
+        obj.material.map = canvasTexture(n.canvas);
+      }
+      setColor(obj.material.color, t.color);
+      obj.material.opacity = t.color.a;
+      // Screen text: [-1, 1] on both axes, size in tenths of the screen height.
+      const k = t.screen ? 0.2 : 1;
+      const h = t.size * n.lines * k;
+      const w = h * n.aspect;
+      const shift = (t.align === 'left' ? w : t.align === 'right' ? -w : 0) / 2;
+      const t2 = this.world.get(e, Transform2D);
+      const t3 = t.screen ? undefined : this.world.get(e, Transform3D);
+      if (t3) {
+        const { scale } = this.place3(e, t3, alpha, obj);
+        obj.translateX(shift * scale.x);
+        obj.scale.set(w * scale.x, h * scale.y, 1);
+        return;
+      }
+      const { scale } = this.place2(e, t2 ?? ORIGIN2, alpha, obj, t.layer);
+      const sx = scale.x;
+      const sy = scale.y;
+      const ax = t.screen ? 1 / aspect : 1;
+      obj.translateX(shift * ax * sx);
+      obj.scale.set(w * ax * sx, h * sy, 1);
+    });
+    this.sweep(this.texts);
   }
 
   private syncLights(alpha: number): void {
@@ -284,9 +622,9 @@ export class Renderer {
       let y = 0;
       this.world.each([Transform2D, Camera2D], (e, t, c) => {
         half = c.height / 2;
-        const s = alpha < 1 ? this.prev.get(e) : undefined;
-        x = s ? s.p.x + (t.position.x - s.p.x) * alpha : t.position.x;
-        y = s ? s.p.y + (t.position.y - s.p.y) * alpha : t.position.y;
+        const { position } = this.pose2(e, t, alpha);
+        x = position.x;
+        y = position.y;
       });
       const o = this.ortho;
       o.left = -half * aspect;
@@ -342,6 +680,11 @@ export class Renderer {
     n.obj.removeFromParent();
     if (n.obj instanceof THREE.DirectionalLight) n.obj.target.removeFromParent();
     if (n.obj instanceof THREE.Mesh) {
+      if (
+        n.obj.geometry !== this.spriteGeometry &&
+        ![...this.geometries.values()].includes(n.obj.geometry)
+      )
+        n.obj.geometry.dispose();
       const mat = n.obj.material as THREE.Material & { map?: THREE.Texture | null };
       mat.map?.dispose();
       mat.dispose();

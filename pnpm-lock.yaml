@@ -195,6 +195,9 @@ importers:
       '@tessera/core':
         specifier: workspace:*
         version: link:../core
+      '@tessera/input':
+        specifier: workspace:*
+        version: link:../input
       three:
         specifier: ^0.186.1
         version: 0.186.1
@@ -205,6 +208,9 @@ importers:
 
   packages/scene:
     dependencies:
+      '@tessera/audio':
+        specifier: workspace:*
+        version: link:../audio
       '@tessera/core':
         specifier: workspace:*
         version: link:../core

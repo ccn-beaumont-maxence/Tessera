@@ -262,7 +262,15 @@ class Parser {
         return { kind: 'query', vars, body: this.body(), ...at };
       }
       const src = this.tok;
-      if (!this.eat('events')) this.fail('range-for works on `query` or `events<Event>()`', src);
+      if (src.text === 'overlap') {
+        const source = this.expr();
+        this.expect(')');
+        if (vars.length !== 1)
+          this.fail('overlap() gives one variable: for (Entity o : overlap(...))', src);
+        return { kind: 'list', var: vars[0] as Param, source, body: this.body(), ...at };
+      }
+      if (!this.eat('events'))
+        this.fail('range-for works on `query`, `events<Event>()` or `overlap(...)`', src);
       this.expect('<');
       const event = this.ident('an event name').text;
       this.expect('>');

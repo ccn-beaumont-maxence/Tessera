@@ -222,7 +222,7 @@ class Compiler {
     const own = this.structs.get(name);
     if (own) return own;
     const e = ENGINE[name];
-    if (e?.module) this.use(e.module, name);
+    if (e?.module) this.use(e.module, e.kind === 'struct' ? `type ${name}` : name);
     return e;
   }
 
@@ -347,7 +347,7 @@ class Compiler {
         continue;
       }
       const info = this.struct(ty);
-      if (!info || info.kind === 'event') {
+      if (!info || info.kind === 'event' || info.kind === 'struct') {
         this.fail(
           `system parameter "${p.name}" must be Entity, a component or a resource (got ${ty})`,
           p,
@@ -400,7 +400,8 @@ class Compiler {
       if (isValue(ty)) this.useType(TS_TYPE[ty] as string);
       return TS_TYPE[ty] as string;
     }
-    this.struct(ty);
+    const info = this.struct(ty);
+    if (info?.kind === 'struct') return this.use(info.module as string, `type ${ty}`).slice(5);
     return `${this.use('@tessera/compiler/runtime', 'type Value').slice(5)}<typeof ${ty}>`;
   }
 
@@ -513,6 +514,8 @@ class Compiler {
         return this.query(s, b);
       case 'events':
         return this.events(s, b);
+      case 'list':
+        return this.list(s, b);
       case 'break':
       case 'continue':
         if (b.loops === 0) {
@@ -663,6 +666,41 @@ class Compiler {
     );
     b.loops++;
     this.emit(b, `$h${n} = $w.events(${s.event});`, s);
+    this.emit(b, `for (let $i${n} = 0; $i${n} < $h${n}.length; $i${n}++) {`, s);
+    b.indent++;
+    b.lines.push({ text: `${'  '.repeat(b.indent)}const ${s.var.name} = $h${n}[$i${n}];`, pos: s });
+    for (const st of s.body) this.stmt(st, b);
+    b.indent--;
+    b.lines.push({ text: `${'  '.repeat(b.indent)}}`, pos: null });
+    b.loops--;
+    b.scopes.pop();
+  }
+
+  /** `for (Entity o : overlap(shape, size, position))`. */
+  private list(s: Extract<Stmt, { kind: 'list' }>, b: Body): void {
+    const src = s.source;
+    if (src.kind !== 'call' || src.name !== 'overlap')
+      this.fail('range-for works on `query`, `events<Event>()` or `overlap(...)`', src);
+    if (s.var.type.name !== 'Entity' || s.var.type.ref)
+      this.fail(`loop variable must be "Entity ${s.var.name}"`, s.var);
+    this.needsWorld(src, b, 'overlap');
+    const [shape, size, pos] = this.args(src, b, ['string', 'any', 'any']) as [R, R, R];
+    this.vectorArg(size, src);
+    this.vectorArg(pos, src);
+    const n = b.temps + 1;
+    b.temps++;
+    b.scopes.push(new Map());
+    this.declareVar(
+      b,
+      { name: s.var.name, ty: 'Entity', js: s.var.name, writable: false, hint: '' },
+      s.var,
+    );
+    b.loops++;
+    this.emit(
+      b,
+      `$h${n} = ${this.use('@tessera/physics', 'overlap')}($w, ${shape.js}, ${this.obj(size)}, ${this.obj(pos)});`,
+      s,
+    );
     this.emit(b, `for (let $i${n} = 0; $i${n} < $h${n}.length; $i${n}++) {`, s);
     b.indent++;
     b.lines.push({ text: `${'  '.repeat(b.indent)}const ${s.var.name} = $h${n}[$i${n}];`, pos: s });
@@ -940,7 +978,10 @@ class Compiler {
         l.ty === r.ty ||
         (isNum(l.ty) && isNum(r.ty)) ||
         [l.ty, r.ty].every((t) => t === 'Entity' || t === 'none');
-      if (!ok) this.fail(`cannot compare ${l.ty} with ${r.ty}`, e);
+      if (!ok) {
+        const hit = l.ty.startsWith('RayHit') || r.ty.startsWith('RayHit');
+        this.fail(`cannot compare ${l.ty} with ${r.ty}${hit ? ': compare its .entity' : ''}`, e);
+      }
       return { ty: 'bool', js: `(${l.js} ${op}= ${r.js})` };
     }
     if (['<', '<=', '>', '>='].includes(op)) {
@@ -1156,6 +1197,10 @@ class Compiler {
           js: a.length === 0 ? '$w.rng.next()' : `$w.rng.range(${a[0]?.js}, ${a[1]?.js})`,
         };
       }
+      case 'ease': {
+        const [k, t] = this.args(e, b, ['string', 'num']) as [R, R];
+        return { ty: 'float', js: `${core('ease')}(${k.js}, ${t.js})` };
+      }
       case 'randomInt': {
         this.needsWorld(e, b, n);
         const [x, y] = this.args(e, b, ['num', 'num']) as [R, R];
@@ -1204,6 +1249,8 @@ class Compiler {
       }
       case 'events':
         return this.fail('events<T>() is only for range-for: for (Hit h : events<Hit>())', e);
+      case 'overlap':
+        return this.fail('overlap() is only for range-for: for (Entity o : overlap(...))', e);
       case 'down':
       case 'pressed':
       case 'released': {
@@ -1217,6 +1264,18 @@ class Compiler {
         const [a] = this.args(e, b, ['string']) as [R];
         return { ty: 'vec2', js: `${this.use('@tessera/input', 'axis')}($w, ${a.js})` };
       }
+      case 'mouse':
+        this.needsWorld(e, b, n);
+        this.args(e, b, []);
+        return {
+          ty: 'vec2',
+          js: `${this.use('@tessera/render', 'mouse')}($w, ${this.scratchOf('vec2')})`,
+        };
+      case 'mouseRay':
+        this.needsWorld(e, b, n);
+        this.args(e, b, []);
+        this.struct('Ray');
+        return { ty: 'Ray', js: `${this.use('@tessera/render', 'mouseRay')}($w)` };
       case 'raycast': {
         this.needsWorld(e, b, n);
         const [o, d, max, ex] = this.args(e, b, ['any', 'any', 'num', 'Entity'], 3) as [
@@ -1228,22 +1287,78 @@ class Compiler {
         this.vectorArg(o, e);
         this.expectType(d, o.ty, e.args[1] as Expr);
         const opts = ex ? `{ exclude: ${ex.js} }` : '{}';
+        const ty = o.ty === 'vec2' ? 'RayHit2D' : 'RayHit';
+        this.struct(ty);
+        const m = this.repeatable(max.js, b);
         return {
-          ty: 'Entity',
-          js: `(${this.use('@tessera/physics', 'raycast')}($w, ${this.obj(o)}, ${this.obj(d)}, ${max.js}, ${opts})?.entity ?? 0)`,
+          ty,
+          js: `(${this.use('@tessera/physics', 'raycast')}($w, ${this.obj(o)}, ${this.obj(d)}, ${m.first}, ${opts}) ?? ${this.use('@tessera/compiler/runtime', '$noHit')}(${m.ref}))`,
         };
       }
       case 'play':
       case 'music': {
         this.needsWorld(e, b, n);
-        const [a] = this.args(e, b, ['string']) as [R];
-        const url =
-          ASSET.test(a.js) && !/^"(\/|[a-z]+:)/i.test(a.js)
-            ? `new URL(${a.js}, import.meta.url).href`
-            : a.js;
+        const [a, ...rest] = this.args(e, b, ['string', 'any', 'num', 'num'], 1) as R[];
+        const url = this.assetUrl(a as R);
+        if (n === 'music') {
+          if (rest.length > 0) this.fail('music() takes the file only: music("theme.ogg")', e);
+          return { ty: 'void', js: `${this.use('@tessera/audio', 'playMusic')}($w, ${url})` };
+        }
+        const at = rest[0] && isValue(rest[0].ty) ? rest.shift() : undefined;
+        if (at) this.vectorArg(at, e);
+        if (rest.length > 2 || rest.some((r) => !isNum(r.ty)))
+          this.fail('play(file, volume = 1, pitch = 1) or play(file, position, volume, pitch)', e);
+        const opts = [
+          at ? `position: ${this.fresh(at.ty, this.comps(at, b))}` : '',
+          rest[0] ? `volume: ${rest[0].js}` : '',
+          rest[1] ? `pitch: ${rest[1].js}` : '',
+        ].filter(Boolean);
+        return {
+          ty: 'int',
+          js: `${this.use('@tessera/audio', 'playSound')}($w, ${url}${opts.length ? `, { ${opts.join(', ')} }` : ''})`,
+        };
+      }
+      case 'save': {
+        this.needsWorld(e, b, n);
+        const [k, v] = this.args(e, b, ['string', 'any']) as [R, R];
+        if (!isNum(v.ty) && v.ty !== 'string' && v.ty !== 'bool')
+          this.fail(`save() stores numbers, strings and bools, got ${v.ty}`, e);
+        return { ty: 'void', js: `${core('save')}(${k.js}, ${v.js})` };
+      }
+      case 'load': {
+        this.needsWorld(e, b, n);
+        const [k, d] = this.args(e, b, ['string', 'any']) as [R, R];
+        if (!isNum(d.ty) && d.ty !== 'string' && d.ty !== 'bool')
+          this.fail(`load(key, default): the default must be a number, string or bool`, e);
+        return { ty: d.ty, js: `${core('load')}(${k.js}, ${d.js})` };
+      }
+      case 'stop': {
+        this.needsWorld(e, b, n);
+        const [id] = this.args(e, b, ['num']) as [R];
+        return { ty: 'void', js: `${this.use('@tessera/audio', 'stopSound')}($w, ${id.js})` };
+      }
+      case 'volume': {
+        this.needsWorld(e, b, n);
+        const [bus, v] = this.args(e, b, ['string', 'num']) as [R, R];
         return {
           ty: 'void',
-          js: `${this.use('@tessera/audio', n === 'play' ? 'playSound' : 'playMusic')}($w, ${url})`,
+          js: `${this.use('@tessera/audio', 'setVolume')}($w, ${bus.js}, ${v.js})`,
+        };
+      }
+      case 'loadScene': {
+        this.needsWorld(e, b, n);
+        const [path, ...keep] = e.args;
+        if (!path) return this.fail('loadScene needs a scene path: loadScene("level2.yaml")', e);
+        const p = this.expr(path, b);
+        this.expectType(p, 'string', path);
+        const names = keep.map((k) => {
+          if (k.kind !== 'ident' || this.struct(k.name)?.kind !== 'resource')
+            this.fail('loadScene keeps resources by name: loadScene("level2.yaml", Score)', k);
+          return k.name;
+        });
+        return {
+          ty: 'void',
+          js: `${this.use('@tessera/scene', 'loadScene')}($w, ${p.js}, [${names.join(', ')}])`,
         };
       }
       case 'log':
@@ -1272,6 +1387,7 @@ class Compiler {
         'normalize',
         'random',
         'randomInt',
+        'ease',
         'spawn',
         'destroy',
         'alive',
@@ -1284,9 +1400,17 @@ class Compiler {
         'pressed',
         'released',
         'axis',
+        'mouse',
+        'mouseRay',
         'raycast',
+        'overlap',
         'play',
+        'stop',
+        'volume',
         'music',
+        'loadScene',
+        'save',
+        'load',
         'log',
         'euler',
         'axisAngle',
@@ -1316,6 +1440,13 @@ class Compiler {
     });
     if (isValue(fn.ret)) args.push(this.scratchOf(fn.ret));
     return { ty: fn.ret, js: `${n}(${['$w', ...args].join(', ')})` };
+  }
+
+  /** Asset string literals resolve next to the compiled module. */
+  private assetUrl(a: R): string {
+    return ASSET.test(a.js) && !/^"(\/|[a-z]+:)/i.test(a.js)
+      ? `new URL(${a.js}, import.meta.url).href`
+      : a.js;
   }
 
   private vectorArg(v: R, e: Pos & { name?: string }): void {

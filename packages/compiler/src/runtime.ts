@@ -22,3 +22,11 @@ export function $at(err: unknown, file: string, line: number): Error {
   if (!/\.tess:\d+/.test(e.message)) e.message = `${file}:${line}: ${e.message}`;
   return e;
 }
+
+/** raycast() result when nothing is hit: entity none. */
+export const $noHit = (distance: number) => ({
+  entity: 0,
+  point: { x: 0, y: 0, z: 0 },
+  normal: { x: 0, y: 0, z: 0 },
+  distance,
+});

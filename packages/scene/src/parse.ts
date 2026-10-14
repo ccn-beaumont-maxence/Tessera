@@ -46,6 +46,8 @@ export class Loc {
 
 export interface EntityDef {
   key: string;
+  /** Key of the parent entity (`children:` in YAML). */
+  parent: string | null;
   name: string;
   spec: Spec;
   loc: Loc;
@@ -55,6 +57,8 @@ export interface Parsed {
   path: string;
   dimension: '2d' | '3d';
   scripts: string[];
+  /** Other scenes loadScene() may switch to (absolute paths). */
+  scenes: string[];
   systems: string[];
   input: Record<string, unknown> | null;
   physics: { gravity?: number[] } | null;
@@ -69,6 +73,7 @@ export interface Parsed {
 const TOP_KEYS = [
   'dimension',
   'scripts',
+  'scenes',
   'systems',
   'input',
   'physics',
@@ -163,32 +168,48 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
   const entityData = data.entities ?? [];
   if (!Array.isArray(entityData)) return loc.at('entities').fail('entities must be a list');
   const names = new Map<string, number>();
-  for (const e of entityData)
-    if (isObj(e) && typeof e.name === 'string') names.set(e.name, (names.get(e.name) ?? 0) + 1);
-  const entities = entityData.map((e: unknown, i: number): EntityDef => {
-    const l: Loc = loc.at('entities', i);
-    if (!isObj(e)) return l.fail('each entity is a map of components (plus optional name, prefab)');
-    const { name = '', prefab, ...rest } = e;
-    if (typeof name !== 'string') return l.at('name').fail('name must be a string');
-    let spec = toSpec(rest, l);
-    if (prefab !== undefined) {
-      const p = typeof prefab === 'string' ? prefabs[prefab] : undefined;
-      if (!p)
-        return l
-          .at('prefab')
-          .fail(
-            `unknown prefab "${String(prefab)}"${suggest(String(prefab), Object.keys(prefabs))}`,
-          );
-      spec = mergeSpec(p.spec, spec);
+  const count = (list: unknown[]) => {
+    for (const e of list) {
+      if (!isObj(e)) continue;
+      if (typeof e.name === 'string') names.set(e.name, (names.get(e.name) ?? 0) + 1);
+      if (Array.isArray(e.children)) count(e.children);
     }
-    const key = name && names.get(name) === 1 ? name : `#${i}`;
-    return { key, name, spec, loc: l };
-  });
+  };
+  count(entityData);
+  const entities: EntityDef[] = [];
+  // Pre-order: a parent is always spawned before its children.
+  const walk = (list: unknown[], at: Loc, parent: string | null, prefix: string): void => {
+    for (const [i, e] of list.entries()) {
+      const l: Loc = at.at(i);
+      if (!isObj(e))
+        return l.fail('each entity is a map of components (plus optional name, prefab, children)');
+      const { name = '', prefab, children, ...rest } = e;
+      if (typeof name !== 'string') return l.at('name').fail('name must be a string');
+      let spec = toSpec(rest, l);
+      if (prefab !== undefined) {
+        const p = typeof prefab === 'string' ? prefabs[prefab] : undefined;
+        if (!p)
+          return l
+            .at('prefab')
+            .fail(
+              `unknown prefab "${String(prefab)}"${suggest(String(prefab), Object.keys(prefabs))}`,
+            );
+        spec = mergeSpec(p.spec, spec);
+      }
+      const key = name && names.get(name) === 1 ? name : `${prefix}#${i}`;
+      entities.push({ key, parent, name, spec, loc: l });
+      if (children === undefined) continue;
+      if (!Array.isArray(children)) return l.at('children').fail('children must be a list');
+      walk(children, l.at('children'), key, `${key}/`);
+    }
+  };
+  walk(entityData, loc.at('entities'), null, '');
 
   return {
     path,
     dimension,
     scripts: list('scripts').map((s) => join(dir, s)),
+    scenes: list('scenes').map((s) => join(dir, s)),
     systems: list('systems'),
     input: input as Record<string, unknown> | null,
     physics: physics as Parsed['physics'],

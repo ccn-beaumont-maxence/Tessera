@@ -1,6 +1,6 @@
 dimension: 2d
 scripts: [./game.tess]
-systems: [PlayerMove, EnemyPatrol, Contacts, CameraFollow]
+systems: [PlayerMove, EnemyPatrol, Contacts, CameraFollow, ShowScore]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], stick: PadLeft }
   jump: [Space, KeyW, ArrowUp, PadA]
@@ -30,6 +30,10 @@ entities:
     Transform2D: { position: [0, 2.5] }
     Camera2D: { height: 10 }
     Follow: {}
+  - name: Hud
+    Transform2D: { position: [-0.95, 0.9] }
+    Text: { screen: true, align: left, size: 0.6 }
+    Hud: {}
   - name: Player
     Transform2D: { position: [0, 1] }
     Sprite: { image: ./hero.png, columns: 4, pixelsPerUnit: 16, layer: 2 }
@@ -38,9 +42,18 @@ entities:
     Collider: { shape: capsule, size: [0.8, 1], friction: 0 }
     Player: { spawn: [0, 1] }
 
-  - { name: Ground1, prefab: Block, Transform2D: { position: [5, -0.5] }, Sprite: { size: [20, 1] }, Collider: { size: [20, 1] } }
-  - { name: Ground2, prefab: Block, Transform2D: { position: [30, -0.5] }, Sprite: { size: [20, 1] }, Collider: { size: [20, 1] } }
-  - { name: Wall, prefab: Block, Transform2D: { position: [-5.5, 2] }, Sprite: { size: [1, 6] }, Collider: { size: [1, 6] } }
+  - name: Level                # top-left corner; each '#' is a 1 m tile
+    Transform2D: { position: [-6, 5] }
+    Tilemap:
+      color: '#3a7d44'
+      friction: 0
+      tiles:
+        - '#'
+        - '#'
+        - '#'
+        - '#'
+        - '#'
+        - '#####################.....####################'
   - { name: Step1, prefab: Block, Transform2D: { position: [6, 1.6] }, Sprite: { size: [3, 0.4] }, Collider: { size: [3, 0.4] } }
   - { name: Step2, prefab: Block, Transform2D: { position: [10, 3.2] }, Sprite: { size: [3, 0.4] }, Collider: { size: [3, 0.4] } }
   - { name: Bridge, prefab: Block, Transform2D: { position: [17.5, 1.4] }, Sprite: { size: [3, 0.4] }, Collider: { size: [3, 0.4] } }

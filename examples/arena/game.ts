@@ -1,7 +1,17 @@
-import { component, mut, quat, resource, system, Transform3D, vec3 } from '@tessera/core';
-import { axis, isDown } from '@tessera/input';
+import {
+  component,
+  mut,
+  quat,
+  resource,
+  type System,
+  system,
+  Transform3D,
+  vec3,
+} from '@tessera/core';
+import { axis, isDown, wasPressed } from '@tessera/input';
 import { Collision, RigidBody } from '@tessera/physics';
-import { spawnPrefab } from '@tessera/scene';
+import { Text } from '@tessera/render';
+import { loadScene, spawnPrefab } from '@tessera/scene';
 
 export const Player = component('Player', () => ({
   speed: 6,
@@ -10,7 +20,8 @@ export const Player = component('Player', () => ({
   cooldown: 0,
 }));
 export const Enemy = component('Enemy', () => ({ speed: 2.5, hp: 2 }));
-export const Bullet = component('Bullet', () => ({ speed: 16, life: 1.2 }));
+export const Bullet = component('Bullet', () => ({ speed: 16 }));
+export const Hud = component('Hud', () => ({}));
 export const Game = resource('Game', () => ({ lives: 3, kills: 0, over: false }));
 export const Spawner = resource('Spawner', () => ({
   interval: 2,
@@ -64,11 +75,6 @@ export const Shoot = system(
   { reads: [Game, Enemy] },
 );
 
-export const BulletLife = system('BulletLife', [mut(Bullet)], (w, e, b) => {
-  b.life -= w.dt;
-  if (b.life <= 0) w.destroy(e);
-});
-
 export const EnemyChase = system(
   'EnemyChase',
   [mut(RigidBody), Enemy, Transform3D],
@@ -114,6 +120,11 @@ export const Hits = system(
         w.destroy(other);
         en.hp--;
         if (en.hp <= 0) {
+          const t = w.get(e, Transform3D);
+          if (t)
+            spawnPrefab(w, 'Boom', {
+              Transform3D: { position: [t.position.x, t.position.y, t.position.z] },
+            });
           w.destroy(e);
           game.kills++;
         }
@@ -126,3 +137,22 @@ export const Hits = system(
   },
   { writes: [Game], reads: [Bullet, Player] },
 );
+
+export const ShowScore = system(
+  'ShowScore',
+  [mut(Text), Hud],
+  (w, _e, t) => {
+    const g = w.resource(Game);
+    t.text = `Lives ${g.lives}  Kills ${g.kills}${g.over ? '\nGame over' : ''}`;
+  },
+  { reads: [Game] },
+);
+
+export const Restart: System = {
+  name: 'Restart',
+  reads: [Game],
+  writes: [],
+  run: (w) => {
+    if (w.resource(Game).over && wasPressed(w, 'fire')) loadScene(w, 'scene.yaml');
+  },
+};

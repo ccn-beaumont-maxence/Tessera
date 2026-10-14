@@ -1,6 +1,6 @@
 dimension: 3d
 scripts: [./game.tess]
-systems: [PlayerMove, Shoot, BulletLife, EnemyChase, SpawnEnemies, Hits]
+systems: [PlayerMove, Shoot, EnemyChase, SpawnEnemies, Hits, ShowScore, Restart]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
   fire: [Space, MouseLeft, PadRT]
@@ -19,6 +19,11 @@ prefabs:
     RigidBody: { gravityScale: 0 }
     Collider: { shape: sphere, size: [0.25, 0.25, 0.25], sensor: true }
     Bullet: {}
+    Timer: { duration: 1.2, destroy: true }
+  Boom:                          # kill effect: one burst, gone after 0.6 s
+    Transform3D: {}
+    Particles: { rate: 0, burst: 24, lifetime: 0.5, speed: 6, spread: 6.3, gravity: 9, color: '#ffd166', endColor: '#d1495b', size: 0.25 }
+    Timer: { duration: 0.6, destroy: true }
   Enemy:
     Transform3D: {}
     Mesh: { shape: capsule, size: [0.8, 1.2, 0.8], color: '#d1495b' }
@@ -30,6 +35,10 @@ entities:
   - name: Camera
     Transform3D: { position: [0, 22, 15], rotation: [-0.98, 0, 0] }
     Camera3D: { fov: 55 }
+  - name: Hud
+    Transform2D: { position: [-0.95, 0.9] }
+    Text: { screen: true, align: left, size: 0.6 }
+    Hud: {}
   - name: Sun
     Transform3D: { position: [0, 10, 0], rotation: [-1.0, 0.4, 0] }
     Light: { intensity: 2.5 }
@@ -49,3 +58,7 @@ entities:
     RigidBody: { lockRotation: true }
     Collider: { shape: capsule, size: [0.8, 1.6, 0.8] }
     Player: {}
+    children:
+      - name: Gun
+        Transform3D: { position: [0, 0.1, -0.5] }
+        Mesh: { size: [0.2, 0.2, 0.6], color: '#f2cc8f' }

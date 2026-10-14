@@ -62,7 +62,7 @@
         },
         {
           "name": "support.class.engine.tess",
-          "match": "\\b(Transform2D|Transform3D|RigidBody|Collider|Collision|Sprite|SpriteAnimation|Mesh|Light|Camera2D|Camera3D)\\b"
+          "match": "\\b(Transform2D|Transform3D|Parent|Timer|Tilemap|Particles|Animator|Ray|RayHit|RayHit2D|RigidBody|Collider|Collision|Sprite|SpriteAnimation|Text|Mesh|Light|Camera2D|Camera3D)\\b"
         },
         { "name": "entity.name.type.tess", "match": "\\b[A-Z]\\w*\\b" },
         {

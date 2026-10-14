@@ -1,6 +1,7 @@
 component Player { float speed = 6; vec3 facing = vec3(0, 0, -1); float fireRate = 0.25; float cooldown; }
 component Enemy { float speed = 2.5; int hp = 2; }
-component Bullet { float speed = 16; float life = 1.2; }
+component Bullet { float speed = 16; }
+component Hud {}
 resource Game { int lives = 3; int kills; bool over; }
 resource Spawner { float interval = 2; float timer = 1; float radius = 9; float minInterval = 0.6; }
 
@@ -36,11 +37,6 @@ system Shoot(Player& p, Transform3D t, Game game) {
         RigidBody { velocity = vec3(dx * 16, 0, dz * 16) });
 }
 
-system BulletLife(Entity e, Bullet& b) {
-    b.life -= dt;
-    if (b.life <= 0) destroy(e);
-}
-
 system EnemyChase(RigidBody& body, Enemy en, Transform3D t) {
     for (Player p, Transform3D target : query) {
         float dx = target.position.x - t.position.x;
@@ -71,6 +67,7 @@ system Hits(Entity e, Enemy& en, Game& game) {
             destroy(other);
             en.hp--;
             if (en.hp <= 0) {
+                spawn("Boom", Transform3D { position = get<Transform3D>(e).position });
                 destroy(e);
                 game.kills++;
             }
@@ -80,4 +77,12 @@ system Hits(Entity e, Enemy& en, Game& game) {
             game.over = game.lives == 0;
         }
     }
+}
+
+system ShowScore(Text& t, Hud h, Game game) {
+    t.text = "Lives " + game.lives + "  Kills " + game.kills + (game.over ? "\nGame over" : "");
+}
+
+system Restart(Game game) {
+    if (game.over && pressed("fire")) loadScene("scene.yaml");
 }

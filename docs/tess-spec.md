@@ -64,7 +64,7 @@ void respawn(Entity e, Score& score) { get<Transform2D>(e).position = vec2(0, 1)
 Parameters are read-only; component and resource parameters may be `T&` (passed by reference).
 
 `if/else`, `while`, `for (init; cond; step)`, `break`, `continue`, `return`, `? :`,
-`+ - * / %`, `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
+`+ - * / %` (`+` with a string concatenates: `"Coins " + n`), `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
 
 Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (combine),
 `q * v` (rotate). Fields `.x .y .z .w`, `.r .g .b .a`.
@@ -74,7 +74,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Area | Built-ins |
 | --- | --- |
 | Time | `dt`, `time`, `frame` |
-| Math | `abs min max clamp floor ceil round sqrt pow sin cos tan atan2 PI`, `lerp(a, b, t)` (floats or vectors) |
+| Math | `abs min max clamp floor ceil round sqrt pow sin cos tan atan2 PI`, `lerp(a, b, t)` (floats or vectors), `ease("out", t)` (linear in out inOut outBack outBounce) |
 | Vectors | `vec2(x, y)`, `vec3(x, y, z)`, `len(v)`, `dist(a, b)`, `dot(a, b)`, `cross(a, b)`, `normalize(v)` |
 | Rotation | `quat(x, y, z, w)`, `euler(x, y, z)` (radians), `axisAngle(axis, angle)` |
 | Color | `color(r, g, b, a = 1)`, `color("#ff8800")` |
@@ -82,15 +82,17 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Entities | `spawn("Prefab", Comp { field = v, ... }, ...)` returns Entity, `destroy(e)`, `alive(e)`, `has<T>(e)`, `get<T>(e)` (writable; error if missing), `add<T>(e)`, `remove<T>(e)` |
 | Queries | `for (Entity o, Enemy en, Transform3D t : query) { ... }` |
 | Events | `for (Collision c : events<Collision>()) { ... }` (last frame's), `emit(Hit { target = e })` |
-| Input | `down("jump")`, `pressed("jump")`, `released("jump")`, `axis("move")` (vec2, y up) |
-| Physics | `raycast(origin, dir, maxDist, exclude = none)` returns the hit Entity or `none` |
-| Audio | `play("coin.wav")`, `music("theme.ogg")` |
+| Input | `down("jump")`, `pressed("jump")`, `released("jump")`, `axis("move")` (vec2, y up), `mouse()` (pointer in the 2D world, vec2), `mouseRay()` (3D: `Ray {origin, dir}` from the camera through the pointer) |
+| Physics | `raycast(origin, dir, maxDist, exclude = none)` returns `RayHit {entity, point, normal, distance}` (`entity == none`: no hit; vec2 fields in 2D), `for (Entity o : overlap("box", size, position)) { ... }` (Collider shapes) |
+| Audio | `play("hit.wav", volume = 1, pitch = 1)` or `play("hit.wav", position, volume, pitch)` (3D sound heard from the camera) return an int id for `stop(id)`; `music("theme.ogg")` (`""` stops), `volume("music", 0.5)` (buses master, music, sfx) |
+| Scenes | `loadScene("level2.yaml", Score, ...)` at the end of the frame: everything is replaced except the listed resources (path relative to the current scene; list it under `scenes:`) |
+| Save | `save("best", score.best)`, `load("best", 0)` (type of the default; kept across runs in browsers) |
 | Debug | `log(a, b, ...)` |
 
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,
-`Transform3D {position, rotation, scale}`, `RigidBody {type, velocity, angularVelocity,
+`Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `Timer {duration, time, repeat, destroy, done}`, `RigidBody {type, velocity, angularVelocity,
 gravityScale, linearDamping, lockRotation}`, `Collider {shape, size, sensor, friction,
-restitution, density}`, `Sprite`, `SpriteAnimation`, `Mesh`, `Light`, `Camera2D`, `Camera3D`.
+restitution, density}`, `Sprite`, `SpriteAnimation`, `Text {text, size, color, align, layer, screen}`, `Tilemap`, `Particles` (set `burst` to emit), `Mesh`, `Animator {clip, speed, loop, time}` (glTF clip of Mesh.model), `Light`, `Camera2D`, `Camera3D`.
 Engine event: `Collision {Entity a; Entity b; bool started; bool sensor;}`.
 
 Conventions: Y up, meters, radians, 3D forward is -Z.

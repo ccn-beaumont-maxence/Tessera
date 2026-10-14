@@ -41,6 +41,20 @@ export const Sprite = component('Sprite', () => ({
   flipX: false,
 }));
 
+/**
+ * Text, `size` = line height. In the world it uses Transform2D or Transform3D (facing +Z).
+ * `screen: true` draws it over everything: Transform2D position in [-1, 1] (y up, corners at
+ * ±1), size in tenths of the screen height. Lines split on `\n`.
+ */
+export const Text = component('Text', () => ({
+  text: '',
+  size: 0.5,
+  color: color(),
+  align: 'center' as 'left' | 'center' | 'right',
+  layer: 0,
+  screen: false,
+}));
+
 /** Plays spritesheet frames (indices, row-major from top-left) at `fps`. */
 export const SpriteAnimation = component('SpriteAnimation', () => ({
   frames: [0] as number[],
@@ -59,3 +73,18 @@ export const SpriteAnimate = system(
     sprite.frame = anim.frames[anim.loop ? i % n : Math.min(i, n - 1)] ?? 0;
   },
 );
+
+/**
+ * Plays an animation clip of the entity's glTF `Mesh.model` ('' = its first clip), posed from
+ * `time` (advanced by the simulation, so it stays deterministic and inspectable).
+ */
+export const Animator = component('Animator', () => ({
+  clip: '',
+  speed: 1,
+  loop: true,
+  time: 0,
+}));
+
+export const Animate = system('Animate', [mut(Animator)], (w, _e, a) => {
+  a.time += w.dt * a.speed;
+});

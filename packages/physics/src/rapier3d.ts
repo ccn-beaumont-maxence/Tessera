@@ -67,6 +67,21 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
     return this.rw.createCollider(desc, body);
   }
 
+  protected createBox(
+    body: R.RigidBody,
+    x: number,
+    y: number,
+    hw: number,
+    hh: number,
+    friction: number,
+  ) {
+    const desc = R.ColliderDesc.cuboid(hw, hh, 0.5)
+      .setTranslation(x, y, 0)
+      .setFriction(friction)
+      .setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    return this.rw.createCollider(desc, body);
+  }
+
   protected removeBody(body: R.RigidBody): void {
     this.rw.removeRigidBody(body);
   }
@@ -129,6 +144,11 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
 
   protected isSensor(handle: number): boolean {
     return this.rw.getCollider(handle)?.isSensor() ?? false;
+  }
+
+  dispose(): void {
+    this.queue.free();
+    this.rw.free();
   }
 
   raycast(origin: Point, dir: Point, max: number, opts: RayOptions): RayHit | null {

@@ -3,11 +3,15 @@ import { join } from 'node:path';
 import {
   type ComponentType,
   type System,
+  Timer,
+  Timers,
   Transform2D,
   Transform3D,
   vec2,
+  vec3,
   World,
 } from '@tessera/core';
+import { addPhysics, Collider } from '@tessera/physics';
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from './index';
 
@@ -68,6 +72,14 @@ describe('type errors', () => {
     ['void f() { if (vec2(1, 2)) {} }', 'condition must be bool, got vec2'],
     ['void f() { break; }', '`break` outside of a loop'],
     [
+      'system S(Ray r) {}',
+      'system parameter "r" must be Entity, a component or a resource (got Ray)',
+    ],
+    [
+      'component H { float v; }\nvoid f() { loadScene("a.yaml", H); }',
+      'loadScene keeps resources by name: loadScene("level2.yaml", Score)',
+    ],
+    [
       'component H { float v; }\nsystem S(H h) { for (H o : query) { break; } }',
       '`break` cannot leave a query loop',
     ],
@@ -121,6 +133,74 @@ const comp = (m: Record<string, unknown>, name: string) =>
   m[name] as ComponentType<Record<string, unknown>>;
 
 describe('generated code', () => {
+  it('follows the pointer in 2D and on the 3D ground', async () => {
+    const m = await load(`
+float groundT(Ray r) { return -r.origin.y / r.dir.y; }
+system Aim(Transform3D& t) {
+    auto r = mouseRay();
+    t.position = r.origin + r.dir * groundT(r);
+}
+system Cursor(Transform2D& t) { t.position = mouse(); }
+`);
+    const w = new World();
+    const e = w.spawn();
+    w.add(e, Transform3D);
+    w.add(e, Transform2D);
+    w.addSystem(sys(m, 'Aim'), sys(m, 'Cursor'));
+    w.step();
+    const p = w.get(e, Transform3D)?.position;
+    expect([p?.x, p?.y, p?.z].map((n) => Math.round((n ?? 9) * 1e6) / 1e6 + 0)).toEqual([0, 0, 0]);
+    expect(w.get(e, Transform2D)?.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('plays, positions, stops sounds and sets volumes', async () => {
+    const m = await load(`
+resource Sfx { int id; }
+system Noise(Transform3D t, Sfx& s) {
+    s.id = play("https://x/boom.wav", t.position, 0.5, 2);
+    play("https://x/a.wav");
+    stop(s.id);
+    volume("music", 0.3);
+    music("");
+}
+`);
+    const w = new World();
+    w.add(w.spawn(), Transform3D);
+    w.addSystem(sys(m, 'Noise'));
+    w.step();
+    expect(w.resourceList().find(([t]) => t.name === 'Sfx')?.[1]).toEqual({ id: 1 });
+  });
+
+  it('saves and loads values', async () => {
+    const m = await load(`
+resource Best { int score; }
+system Keep(Best& b) {
+    b.score = load("t-best", 3) + 1;
+    save("t-best", b.score);
+}
+`);
+    const w = new World();
+    w.addSystem(sys(m, 'Keep'));
+    w.step();
+    w.step();
+    expect(w.resourceList()[0]?.[1]).toEqual({ score: 5 });
+  });
+
+  it('drives eased motion from a Timer', async () => {
+    const m = await load(`
+system Slide(Transform2D& t, Timer timer) {
+    t.position.x = lerp(0, 10, ease("out", timer.time / timer.duration));
+}
+`);
+    const w = new World();
+    const e = w.spawn();
+    w.add(e, Transform2D);
+    w.add(e, Timer, { duration: 1 });
+    w.addSystem(Timers, sys(m, 'Slide'));
+    for (let i = 0; i < 30; i++) w.step();
+    expect(w.get(e, Transform2D)?.position.x).toBeCloseTo(7.5);
+  });
+
   it('runs vector math without allocating new vectors', async () => {
     const m = await load(`
 component Vel { vec2 v = vec2(3, 4); float k = 2; }
@@ -180,6 +260,33 @@ system Q(Tint t, Out& o) {
     expect(out.r).toBeCloseTo(8);
     expect(out.count).toBe(22);
     expect(out.l).toBeCloseTo(2);
+  });
+
+  it('reads raycast hits and loops over overlaps', async () => {
+    const m = await load(`
+resource Probe { vec2 point; vec2 normal; float distance; Entity hit; int near; }
+system Look(Probe& p) {
+    RayHit2D h = raycast(vec2(0, 5), vec2(0, -1), 20);
+    p.point = h.point;
+    p.normal = h.normal;
+    p.distance = h.distance;
+    p.hit = h.entity;
+    if (raycast(vec2(0, 5), vec2(0, 1), 20).entity == none) p.near = -1;
+    for (Entity o : overlap("sphere", vec2(1, 1), vec2(0, 0))) if (o == p.hit) p.near += 10;
+}
+`);
+    const w = new World();
+    const ground = w.spawn();
+    w.add(ground, Transform2D);
+    w.add(ground, Collider, { size: vec3(4, 1, 1) });
+    await addPhysics(w, { dimension: '2d' });
+    w.addSystem(sys(m, 'Look'));
+    w.step();
+    w.step();
+    const p = w.resourceList().find(([t]) => t.name === 'Probe')?.[1] as Record<string, unknown>;
+    expect(p).toMatchObject({ point: { x: 0, y: 0.5 }, normal: { x: 0, y: 1 }, hit: ground });
+    expect(p.distance).toBeCloseTo(4.5);
+    expect(p.near).toBe(9);
   });
 
   it('emits events, spawns nothing without a scene, and reports runtime errors at the .tess line', async () => {

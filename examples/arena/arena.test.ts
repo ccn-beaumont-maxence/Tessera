@@ -1,8 +1,9 @@
+import { Timer } from '@tessera/core';
 import { dump, find, findAll, runFrames } from '@tessera/headless';
 import { press } from '@tessera/input';
 import { describe, expect, it } from 'vitest';
 import { loadExample } from '../load';
-import { Bullet, Game, Player } from './game';
+import { Game, Player } from './game';
 
 async function arena(seed = 1) {
   return loadExample(import.meta.dirname, 'game.ts', seed);
@@ -20,6 +21,10 @@ describe('arena', () => {
     const enemies = findAll(w, 'Enemy').length;
     runFrames(w, 300);
     expect(findAll(w, 'Enemy').length).toBe(enemies);
+    press(w, 'fire');
+    runFrames(w, 2);
+    expect(w.resource(Game)).toEqual({ lives: 3, kills: 0, over: false });
+    expect(findAll(w, 'Enemy')).toHaveLength(0);
   });
 
   it('auto-aims at the nearest enemy and kills enemies', async () => {
@@ -31,7 +36,7 @@ describe('arena', () => {
     expect(w.get(find(w, 'Player'), Player)?.facing).toEqual({ x: 0, y: 0, z: -1 });
     runFrames(w, 60 * 20);
     expect(w.resource(Game).kills).toBeGreaterThan(2);
-    for (const b of findAll(w, 'Bullet')) expect(w.get(b, Bullet)?.life).toBeGreaterThan(0);
+    for (const b of findAll(w, 'Bullet')) expect(w.get(b, Timer)?.done).toBe(false);
   });
 
   it('moves and turns the player', async () => {

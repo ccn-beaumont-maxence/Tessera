@@ -6,6 +6,7 @@ component Player { float speed = 6; float jump = 11; vec2 spawn; bool grounded; 
 component Coin { int value = 1; }
 component Goal {}
 component Follow { float minY = 2.5; }
+component Hud {}
 resource Score { int coins; int stomps; int deaths; bool won; }
 
 void respawn(Entity e, Score& score) {
@@ -17,7 +18,7 @@ void respawn(Entity e, Score& score) {
 }
 
 system PlayerMove(Entity e, RigidBody& body, Player& p, Transform2D t, Sprite& sprite, Score& score) {
-    p.grounded = raycast(t.position, vec2(0, -1), 0.6, e) != none;
+    p.grounded = raycast(t.position, vec2(0, -1), 0.6, e).entity != none;
     float x = axis("move").x;
     body.velocity.x = x * p.speed;
     if (x != 0) sprite.flipX = x < 0;
@@ -52,4 +53,8 @@ system CameraFollow(Transform2D& cam, Follow f, Camera2D c) {
         cam.position.x = t.position.x;
         cam.position.y = max(t.position.y, f.minY);
     }
+}
+
+system ShowScore(Text& t, Hud h, Score score) {
+    t.text = score.won ? "You win!" : "Coins " + score.coins + "  Deaths " + score.deaths;
 }
