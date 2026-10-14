@@ -24,8 +24,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec tess build examples/forest/scene.yaml --out site
+      - run: pnpm exec tess build examples/forest/scene.yaml --out site/forest
       - run: pnpm exec tess build examples/dawnvale/scene.yaml --out site/dawnvale
+      - run: cp docs/home.html site/index.html && cp docs/forest.png docs/dawnvale.png site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
