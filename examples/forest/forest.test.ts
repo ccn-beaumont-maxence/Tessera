@@ -9,7 +9,7 @@ describe('forest', () => {
   it('walks, and wakes the forest once every wisp is found', async () => {
     const w = await loadExample(import.meta.dirname, 'game.tess');
     runFrames(w, 30);
-    expect(findAll(w, 'Trunk').length).toBe(120);
+    expect(findAll(w, 'Tree').length).toBe(95);
     const hero = w.get(find(w, 'Wanderer'), Transform3D);
     if (!hero) throw new Error('no Wanderer');
     const z = hero.position.z;

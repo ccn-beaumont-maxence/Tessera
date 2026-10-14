@@ -138,8 +138,12 @@ const UNIT: Record<string, () => THREE.BufferGeometry> = {
   plane: () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
   capsule: () => new THREE.CapsuleGeometry(0.5, 1, 8, 16),
   cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
-  cone: () => new THREE.ConeGeometry(0.5, 1, 24),
+  cone: () => new THREE.ConeGeometry(0.5, 1, 7),
+  ico: () => new THREE.IcosahedronGeometry(0.5, 1),
 };
+
+/** Low-poly shapes drawn with flat faces. */
+const FACETED = new Set(['cone', 'ico']);
 
 const ORIGIN2 = Transform2D.create();
 
@@ -327,7 +331,10 @@ export class Renderer {
         if (n) this.drop(n);
         const obj = m.model
           ? this.model(m.model)
-          : new THREE.Mesh(this.geometry(m.shape), new THREE.MeshStandardMaterial());
+          : new THREE.Mesh(
+              this.geometry(m.shape),
+              new THREE.MeshStandardMaterial({ flatShading: FACETED.has(m.shape) }),
+            );
         obj.castShadow = obj.receiveShadow = true;
         this.scene.add(obj);
         n = { obj, key, stamp: 0 };

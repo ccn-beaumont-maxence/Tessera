@@ -1,12 +1,13 @@
 import { color, component, mut, system, vec2, vec3 } from '@tessera/core';
 
 /**
- * Primitive 3D shape sized in meters (sphere/capsule/cylinder/cone use size.x as diameter),
+ * Primitive 3D shape sized in meters (sphere/capsule/cylinder/cone/ico use size.x as diameter;
+ * cone and ico are faceted low-poly shapes),
  * or a glTF `model` URL (size then scales the model; color/roughness/metalness are ignored).
  * `emissive` makes it glow in its own color (0 = off; pairs with `Camera3D.bloom`).
  */
 export const Mesh = component('Mesh', () => ({
-  shape: 'box' as 'box' | 'sphere' | 'plane' | 'capsule' | 'cylinder' | 'cone',
+  shape: 'box' as 'box' | 'sphere' | 'plane' | 'capsule' | 'cylinder' | 'cone' | 'ico',
   size: vec3(1, 1, 1),
   color: color(),
   roughness: 0.8,

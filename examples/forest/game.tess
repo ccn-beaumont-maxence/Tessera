@@ -2,8 +2,9 @@
 using "./forest.tess";
 
 component Wanderer { float heading; float speed = 4.5; float turn = 2.4; }
-component Follow { float distance = 6.5; float height = 3; float sharpness = 4; }
+component Follow { float distance = 5.5; float height = 1.6; float sharpness = 4; }
 component Crown {}
+component Stride { float phase; }
 component Hud {}
 component Title {}
 
@@ -18,15 +19,28 @@ system Walk(Entity e, RigidBody& body, Wanderer& w, Transform3D& t) {
     t.rotation = axisAngle(vec3(0, 1, 0), w.heading);
 }
 
+// Walk cycle: the body hops and sways with the wanderer's speed.
+system WalkCycle(Stride& s, Transform3D& t) {
+    for (Wanderer w, RigidBody b : query) {
+        float speed = len(vec2(b.velocity.x, b.velocity.z));
+        s.phase += speed * dt * 2.2;
+        float k = min(1, speed / 3);
+        t.position.y = abs(sin(s.phase)) * 0.09 * k;
+        t.rotation = euler(-0.12 * k, 0, sin(s.phase) * 0.07 * k);
+    }
+}
+
 // Third-person camera: eases toward a spot behind the wanderer and looks at their head.
 system CameraFollow(Transform3D& t, Follow f) {
-    for (Wanderer w, Transform3D p : query) {
-        vec3 goal = p.position + vec3(sin(w.heading), 0, cos(w.heading)) * f.distance + vec3(0, f.height, 0);
-        t.position = lerp(t.position, goal, min(1, dt * f.sharpness));
-        vec3 d = p.position + vec3(0, 1, 0) - t.position;
-        float yaw = atan2(-d.x, -d.z);
-        float pitch = atan2(d.y, len(vec2(d.x, d.z)));
-        t.rotation = axisAngle(vec3(0, 1, 0), yaw) * axisAngle(vec3(1, 0, 0), pitch);
+    for (Entity e, Wanderer w, Transform3D p : query) {
+        vec3 head = p.position + vec3(0, 1, 0);
+        vec3 back = normalize(vec3(sin(w.heading), f.height / f.distance, cos(w.heading)));
+        float reach = len(vec2(f.distance, f.height));
+        RayHit hit = raycast(head, back, reach, e);   // a trunk in the way pulls the camera in
+        if (hit.entity != none) reach = max(hit.distance - 0.3, 1);
+        t.position = lerp(t.position, head + back * reach, min(1, dt * f.sharpness));
+        vec3 d = head - t.position;
+        t.rotation = axisAngle(vec3(0, 1, 0), atan2(-d.x, -d.z)) * axisAngle(vec3(1, 0, 0), atan2(d.y, len(vec2(d.x, d.z))));
     }
 }
 
