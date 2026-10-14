@@ -8,6 +8,7 @@
     "test": "vitest run --root ../.. packages/scene/"
   },
   "dependencies": {
+    "@tessera/audio": "workspace:*",
     "@tessera/core": "workspace:*",
     "@tessera/input": "workspace:*",
     "@tessera/physics": "workspace:*",

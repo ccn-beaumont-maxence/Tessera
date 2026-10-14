@@ -163,7 +163,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] Composant `Animator` (clips glTF, squelettes clonés), temps piloté par la simulation
 
 ## Phase 19 : Audio avancé
-- [ ] `stop`, volume et hauteur par son, son spatial 3D
+- [x] `stop(id)`, volume et hauteur par son, son positionnel entendu depuis la caméra, `volume(bus, v)`
 
 ## Phase 20 : Sauvegarde
 - [ ] `save(key, value)` / `load(key, default)`, localStorage ou mémoire en headless

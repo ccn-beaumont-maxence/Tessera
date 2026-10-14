@@ -153,6 +153,24 @@ system Cursor(Transform2D& t) { t.position = mouse(); }
     expect(w.get(e, Transform2D)?.position).toEqual({ x: 0, y: 0 });
   });
 
+  it('plays, positions, stops sounds and sets volumes', async () => {
+    const m = await load(`
+resource Sfx { int id; }
+system Noise(Transform3D t, Sfx& s) {
+    s.id = play("https://x/boom.wav", t.position, 0.5, 2);
+    play("https://x/a.wav");
+    stop(s.id);
+    volume("music", 0.3);
+    music("");
+}
+`);
+    const w = new World();
+    w.add(w.spawn(), Transform3D);
+    w.addSystem(sys(m, 'Noise'));
+    w.step();
+    expect(w.resourceList().find(([t]) => t.name === 'Sfx')?.[1]).toEqual({ id: 1 });
+  });
+
   it('drives eased motion from a Timer', async () => {
     const m = await load(`
 system Slide(Transform2D& t, Timer timer) {

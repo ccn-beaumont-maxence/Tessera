@@ -208,6 +208,9 @@ importers:
 
   packages/scene:
     dependencies:
+      '@tessera/audio':
+        specifier: workspace:*
+        version: link:../audio
       '@tessera/core':
         specifier: workspace:*
         version: link:../core

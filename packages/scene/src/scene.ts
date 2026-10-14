@@ -1,3 +1,4 @@
+import { setListener } from '@tessera/audio';
 import {
   type ComponentType,
   color,
@@ -17,6 +18,8 @@ import {
   Transform3D,
   vec3,
   type World,
+  worldTransform2D,
+  worldTransform3D,
 } from '@tessera/core';
 import { addInput, type Bindings } from '@tessera/input';
 import { Collider, loadPhysics, RigidBody, startPhysics } from '@tessera/physics';
@@ -280,7 +283,7 @@ function instantiate(world: World, { parsed, registry: r }: Prepared): void {
       world.addSystem(r.systems[name] as System);
     }
   }
-  world.addSystem(SceneLoad);
+  world.addSystem(Listener, SceneLoad);
 
   for (const def of parsed.entities) {
     const e = world.spawn(def.name);
@@ -289,6 +292,33 @@ function instantiate(world: World, { parsed, registry: r }: Prepared): void {
     link(world, e, def);
   }
 }
+
+const camPose = Transform3D.create();
+const cam2 = Transform2D.create();
+
+/** Moves the audio listener to the first camera (2D: `height` meters in front of the plane). */
+const Listener: System = {
+  name: 'Listener',
+  reads: [Camera2D, Camera3D],
+  writes: [],
+  run(world) {
+    for (const e of world.entities()) {
+      if (world.has(e, Camera3D) && world.has(e, Transform3D)) {
+        worldTransform3D(world, e, camPose);
+        return setListener(world, camPose.position, camPose.rotation);
+      }
+      const c2 = world.get(e, Camera2D);
+      if (c2 && world.has(e, Transform2D)) {
+        worldTransform2D(world, e, cam2);
+        camPose.position.x = cam2.position.x;
+        camPose.position.y = cam2.position.y;
+        camPose.position.z = c2.height;
+        camPose.rotation = quat.fromEuler(0, 0, 0, camPose.rotation);
+        return setListener(world, camPose.position, camPose.rotation);
+      }
+    }
+  },
+};
 
 /** Last system of every scene: applies a pending loadScene(). */
 const SceneLoad: System = {

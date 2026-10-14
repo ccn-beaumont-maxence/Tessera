@@ -1298,14 +1298,37 @@ class Compiler {
       case 'play':
       case 'music': {
         this.needsWorld(e, b, n);
-        const [a] = this.args(e, b, ['string']) as [R];
-        const url =
-          ASSET.test(a.js) && !/^"(\/|[a-z]+:)/i.test(a.js)
-            ? `new URL(${a.js}, import.meta.url).href`
-            : a.js;
+        const [a, ...rest] = this.args(e, b, ['string', 'any', 'num', 'num'], 1) as R[];
+        const url = this.assetUrl(a as R);
+        if (n === 'music') {
+          if (rest.length > 0) this.fail('music() takes the file only: music("theme.ogg")', e);
+          return { ty: 'void', js: `${this.use('@tessera/audio', 'playMusic')}($w, ${url})` };
+        }
+        const at = rest[0] && isValue(rest[0].ty) ? rest.shift() : undefined;
+        if (at) this.vectorArg(at, e);
+        if (rest.length > 2 || rest.some((r) => !isNum(r.ty)))
+          this.fail('play(file, volume = 1, pitch = 1) or play(file, position, volume, pitch)', e);
+        const opts = [
+          at ? `position: ${this.fresh(at.ty, this.comps(at, b))}` : '',
+          rest[0] ? `volume: ${rest[0].js}` : '',
+          rest[1] ? `pitch: ${rest[1].js}` : '',
+        ].filter(Boolean);
+        return {
+          ty: 'int',
+          js: `${this.use('@tessera/audio', 'playSound')}($w, ${url}${opts.length ? `, { ${opts.join(', ')} }` : ''})`,
+        };
+      }
+      case 'stop': {
+        this.needsWorld(e, b, n);
+        const [id] = this.args(e, b, ['num']) as [R];
+        return { ty: 'void', js: `${this.use('@tessera/audio', 'stopSound')}($w, ${id.js})` };
+      }
+      case 'volume': {
+        this.needsWorld(e, b, n);
+        const [bus, v] = this.args(e, b, ['string', 'num']) as [R, R];
         return {
           ty: 'void',
-          js: `${this.use('@tessera/audio', n === 'play' ? 'playSound' : 'playMusic')}($w, ${url})`,
+          js: `${this.use('@tessera/audio', 'setVolume')}($w, ${bus.js}, ${v.js})`,
         };
       }
       case 'loadScene': {
@@ -1368,6 +1391,8 @@ class Compiler {
         'raycast',
         'overlap',
         'play',
+        'stop',
+        'volume',
         'music',
         'loadScene',
         'log',
@@ -1399,6 +1424,13 @@ class Compiler {
     });
     if (isValue(fn.ret)) args.push(this.scratchOf(fn.ret));
     return { ty: fn.ret, js: `${n}(${['$w', ...args].join(', ')})` };
+  }
+
+  /** Asset string literals resolve next to the compiled module. */
+  private assetUrl(a: R): string {
+    return ASSET.test(a.js) && !/^"(\/|[a-z]+:)/i.test(a.js)
+      ? `new URL(${a.js}, import.meta.url).href`
+      : a.js;
   }
 
   private vectorArg(v: R, e: Pos & { name?: string }): void {
