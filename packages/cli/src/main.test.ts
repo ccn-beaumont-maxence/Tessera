@@ -187,11 +187,13 @@ describe('tess build and tess test', () => {
         null,
         { timeout: 30_000 },
       );
-      await page.waitForTimeout(500);
-      const frame = await page.evaluate(
-        () => (globalThis as unknown as { tess: { world: { frame: number } } }).tess.world.frame,
+      // Slow CI runners render few frames per second: wait for them instead of a fixed delay.
+      await page.waitForFunction(
+        () =>
+          (globalThis as unknown as { tess: { world: { frame: number } } }).tess.world.frame > 5,
+        null,
+        { timeout: 30_000 },
       );
-      expect(frame).toBeGreaterThan(5);
     } finally {
       await browser.close();
       await server.close();
