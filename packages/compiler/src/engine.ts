@@ -109,6 +109,12 @@ export const ENGINE: Record<string, StructInfo> = {
     metalness: 'float',
     model: 'string',
   }),
+  Animator: s('component', '@tessera/render', {
+    clip: 'string',
+    speed: 'float',
+    loop: 'bool',
+    time: 'float',
+  }),
   Light: s('component', '@tessera/render', { kind: 'string', color: 'color', intensity: 'float' }),
   Camera2D: s('component', '@tessera/render', { height: 'float' }),
   Camera3D: s('component', '@tessera/render', { fov: 'float', near: 'float', far: 'float' }),

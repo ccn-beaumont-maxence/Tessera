@@ -22,7 +22,8 @@ import {
   type World,
 } from '@tessera/core';
 import * as THREE from 'three';
-import { Camera2D, Camera3D, Light, Mesh, Sprite, Text } from './components';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { Animator, Camera2D, Camera3D, Light, Mesh, Sprite, Text } from './components';
 
 interface Prev {
   p: Vec3;
@@ -39,6 +40,15 @@ interface SpriteNode extends Node<THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasi
   /** Frame size in pixels once the image is loaded. */
   px: { w: number; h: number } | null;
 }
+/** glTF animation state, kept in the model group's userData. */
+interface ModelData {
+  mixer: THREE.AnimationMixer;
+  clips: THREE.AnimationClip[];
+  /** Clip currently bound (null = none yet). */
+  clip: string | null;
+  action: THREE.AnimationAction | null;
+}
+
 interface TilemapNode extends Node<THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>> {
   /** Inputs of the current geometry: rebuilt when one changes. */
   tiles: readonly string[];
@@ -317,8 +327,28 @@ export class Renderer {
       }
       const { scale } = this.place3(e, t, alpha, n.obj);
       n.obj.scale.set(scale.x * m.size.x, scale.y * m.size.y, scale.z * m.size.z);
+      const anim = this.world.get(e, Animator);
+      if (anim && 'mixer' in n.obj.userData) this.pose(n.obj.userData as ModelData, anim, m.model);
     });
     this.sweep(this.meshes);
+  }
+
+  /** Applies the Animator's clip at its time (no mixer clock: the simulation drives it). */
+  private pose(u: ModelData, a: { clip: string; loop: boolean; time: number }, url: string) {
+    if (u.clip !== a.clip) {
+      u.clip = a.clip;
+      u.mixer.stopAllAction();
+      const clip = a.clip ? u.clips.find((c) => c.name === a.clip) : u.clips[0];
+      if (!clip) {
+        const names = u.clips.map((c) => c.name).join(', ');
+        console.error(`Animator: ${url} has no clip "${a.clip}" (clips: ${names})`);
+      }
+      u.action = clip ? u.mixer.clipAction(clip).play() : null;
+    }
+    if (!u.action) return;
+    const d = u.action.getClip().duration || 1;
+    u.action.time = a.loop ? ((a.time % d) + d) % d : Math.min(Math.max(a.time, 0), d);
+    u.mixer.update(0);
   }
 
   /** Group that receives a clone of the glTF scene once loaded. */
@@ -326,7 +356,17 @@ export class Renderer {
     const group = new THREE.Group();
     loadModel(url).then(
       (gltf) => {
-        const scene = gltf.scene.clone(true);
+        // SkeletonUtils keeps skinned meshes bound to their own cloned bones.
+        const scene = cloneSkinned(gltf.scene);
+        if (gltf.animations.length > 0) {
+          const model: ModelData = {
+            mixer: new THREE.AnimationMixer(scene),
+            clips: gltf.animations,
+            clip: null,
+            action: null,
+          };
+          group.userData = model;
+        }
         scene.traverse((o) => {
           o.castShadow = o.receiveShadow = true;
         });

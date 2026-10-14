@@ -73,3 +73,18 @@ export const SpriteAnimate = system(
     sprite.frame = anim.frames[anim.loop ? i % n : Math.min(i, n - 1)] ?? 0;
   },
 );
+
+/**
+ * Plays an animation clip of the entity's glTF `Mesh.model` ('' = its first clip), posed from
+ * `time` (advanced by the simulation, so it stays deterministic and inspectable).
+ */
+export const Animator = component('Animator', () => ({
+  clip: '',
+  speed: 1,
+  loop: true,
+  time: 0,
+}));
+
+export const Animate = system('Animate', [mut(Animator)], (w, _e, a) => {
+  a.time += w.dt * a.speed;
+});

@@ -21,6 +21,8 @@ import {
 import { addInput, type Bindings } from '@tessera/input';
 import { Collider, loadPhysics, RigidBody, startPhysics } from '@tessera/physics';
 import {
+  Animate,
+  Animator,
   Camera2D,
   Camera3D,
   Light,
@@ -53,6 +55,7 @@ const BUILTIN_COMPONENTS: Record<string, AnyComponent> = Object.fromEntries(
     Tilemap,
     Particles,
     Mesh,
+    Animator,
     Light,
     Camera3D,
     Camera2D,
@@ -97,7 +100,7 @@ async function registry(parsed: Parsed, io: SceneIO): Promise<Registry> {
   const r: Registry = {
     components: { ...BUILTIN_COMPONENTS },
     resources: {},
-    systems: { SpriteAnimate, Timers, Particles: ParticleSystem },
+    systems: { SpriteAnimate, Animate, Timers, Particles: ParticleSystem },
   };
   for (const [i, script] of parsed.scripts.entries()) {
     let mod: Record<string, unknown>;
@@ -263,6 +266,7 @@ function instantiate(world: World, { parsed, registry: r }: Prepared): void {
   if (usesPhysics(parsed) && !order.includes('Physics')) order.push('Physics');
   if (usesAny(parsed, ['SpriteAnimation']) && !order.includes('SpriteAnimate'))
     order.push('SpriteAnimate');
+  if (usesAny(parsed, ['Animator']) && !order.includes('Animate')) order.push('Animate');
   for (const name of order) {
     if (name === 'Input') {
       addInput(world, (parsed.input ?? {}) as Bindings);

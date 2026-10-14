@@ -160,7 +160,7 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] Composant `Particles`, pool fixe, RNG du monde, champ `burst` ; explosion dans l'arène
 
 ## Phase 18 : Animations glTF
-- [ ] Composant `Animator` (clips glTF), temps piloté par la simulation
+- [x] Composant `Animator` (clips glTF, squelettes clonés), temps piloté par la simulation
 
 ## Phase 19 : Audio avancé
 - [ ] `stop`, volume et hauteur par son, son spatial 3D
