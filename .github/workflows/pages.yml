@@ -25,6 +25,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tess build examples/forest/scene.yaml --out site
+      - run: pnpm exec tess build examples/dawnvale/scene.yaml --out site/dawnvale
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

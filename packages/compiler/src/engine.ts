@@ -67,6 +67,8 @@ export const ENGINE: Record<string, StructInfo> = {
     rows: 'int',
     frame: 'int',
     flipX: 'bool',
+    align: 'string',
+    screen: 'bool',
   }),
   SpriteAnimation: s('component', '@tessera/render', { fps: 'float', loop: 'bool', time: 'float' }),
   Text: s('component', '@tessera/render', {
@@ -76,6 +78,7 @@ export const ENGINE: Record<string, StructInfo> = {
     align: 'string',
     layer: 'float',
     screen: 'bool',
+    billboard: 'bool',
   }),
   Tilemap: s('component', '@tessera/core', {
     chars: 'string',

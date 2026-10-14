@@ -39,6 +39,8 @@ export const Camera2D = component('Camera2D', () => ({ height: 10 }));
 /**
  * 2D sprite. With `image`, its size is the frame size in pixels / pixelsPerUnit;
  * without, it draws a `size` quad tinted by `color`. Higher `layer` draws on top.
+ * `align` picks which edge sits at the position (`left` keeps a bar's left edge fixed while
+ * its scale.x changes). `screen: true` draws it in the HUD like screen Text.
  */
 export const Sprite = component('Sprite', () => ({
   image: '',
@@ -50,12 +52,15 @@ export const Sprite = component('Sprite', () => ({
   rows: 1,
   frame: 0,
   flipX: false,
+  align: 'center' as 'left' | 'center' | 'right',
+  screen: false,
 }));
 
 /**
  * Text, `size` = line height. In the world it uses Transform2D or Transform3D (facing +Z).
  * `screen: true` draws it over everything: Transform2D position in [-1, 1] (y up, corners at
- * ±1), size in tenths of the screen height. Lines split on `\n`.
+ * ±1), size in tenths of the screen height. Lines split on `\n`. `billboard: true` makes
+ * 3D world text face the camera.
  */
 export const Text = component('Text', () => ({
   text: '',
@@ -64,6 +69,7 @@ export const Text = component('Text', () => ({
   align: 'center' as 'left' | 'center' | 'right',
   layer: 0,
   screen: false,
+  billboard: false,
 }));
 
 /** Plays spritesheet frames (indices, row-major from top-left) at `fps`. */

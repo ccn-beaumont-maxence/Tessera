@@ -1,0 +1,182 @@
+// The hero moves, targets and fights; mobs wander, aggro, chase, leash and respawn.
+using "./common.tess";
+
+const vec3 GRAVE = vec3(0, 1, 9);   // where the hero wakes up after dying
+const vec3 GONE = vec3(0, -60, 0);  // the dead wait under the world until they respawn
+
+system HeroMove(Entity e, Hero& h, RigidBody& body, Transform3D& t) {
+    if (h.dead > 0) {
+        body.velocity = vec3(0, 0, 0);
+        return;
+    }
+    vec2 a = axis("move");
+    float strafe = (down("strafeRight") ? 1 : 0) - (down("strafeLeft") ? 1 : 0);
+    h.heading -= a.x * 2.6 * dt;
+    float speed = a.y < 0 ? 3.5 : 7;
+    vec3 v = vec3(-sin(h.heading), 0, -cos(h.heading)) * a.y + vec3(cos(h.heading), 0, -sin(h.heading)) * strafe;
+    if (len(v) > 1) v = normalize(v);
+    body.velocity.x = v.x * speed;
+    body.velocity.z = v.z * speed;
+    bool grounded = raycast(t.position, vec3(0, -1, 0), 1.05, e).entity != none;
+    if (pressed("jump") && grounded) body.velocity.y = 7;
+    t.rotation = axisAngle(vec3(0, 1, 0), h.heading);
+}
+
+bool targetable(Entity m) { return m != none && alive(m) && has<Mob>(m) && get<Mob>(m).dead <= 0; }
+
+system HeroCombat(Entity e, Hero& h, Transform3D t) {
+    h.swingCd = max(h.swingCd - dt, 0);
+    h.strikeCd = max(h.strikeCd - dt, 0);
+    h.swing = max(h.swing - dt * 3, 0);
+    h.combat = max(h.combat - dt, 0);
+    if (h.dead > 0) return;
+    if (!targetable(h.target)) h.target = none;
+    // Tab: the closest living mob within 30 m, preferring the ones in front.
+    if (pressed("target")) {
+        float best = 30;
+        Entity pick = none;
+        vec3 fwd = vec3(-sin(h.heading), 0, -cos(h.heading));
+        for (Entity m, Mob mob, Transform3D mt : query) {
+            vec3 d = mt.position - t.position;
+            if (mob.dead > 0 || m == h.target || len(d) > 30) continue;
+            float score = len(d) - dot(normalize(d), fwd) * 8;
+            if (score < best) {
+                best = score;
+                pick = m;
+            }
+        }
+        if (pick != none) h.target = pick;
+    }
+    if (pressed("select")) {
+        Ray r = mouseRay();
+        RayHit hit = raycast(r.origin, r.dir, 120, e);
+        if (targetable(hit.entity)) h.target = hit.entity;
+    }
+    if (h.target == none || dist(get<Transform3D>(h.target).position, t.position) > 3.2) return;
+    float dmg = 0;
+    if (pressed("strike") && h.strikeCd <= 0) {
+        h.strikeCd = 5;
+        dmg = random(14, 18) + 6 * h.level;
+    } else if (h.swingCd <= 0) {
+        h.swingCd = 1.4;
+        dmg = random(9, 13) + 3 * h.level;
+    }
+    if (dmg <= 0) return;
+    bool crit = random() < 0.1;
+    if (crit) dmg *= 2;
+    int n = round(dmg);
+    h.swing = 1;
+    h.combat = 5;
+    get<Mob>(h.target).hp -= n;
+    get<Mob>(h.target).angry = true;
+    floatText(get<Transform3D>(h.target).position, crit ? n + "!" : "" + n, crit ? color("#ffd23f") : color("#ffffff"));
+}
+
+system MobBrain(Entity e, Mob& m, RigidBody& body, Transform3D& t) {
+    if (m.dead > 0) {
+        m.dead -= dt;
+        body.velocity = vec3(0, 0, 0);
+        t.position = m.home + GONE;
+        if (m.dead <= 0) {
+            t.position = m.home + vec3(0, 1, 0);
+            m.hp = m.maxHp;
+            m.angry = false;
+        }
+        return;
+    }
+    if (m.hp <= 0) {
+        m.dead = m.respawn;
+        emit(Killed { kind = m.kind, at = t.position, xp = m.xp });
+        return;
+    }
+    m.cd = max(m.cd - dt, 0);
+    vec3 goal = m.goal;
+    float speed = m.speed * 0.35;
+    for (Hero h, Transform3D ht : query) {
+        float d = dist(ht.position, t.position);
+        if (h.dead > 0 || dist(t.position, m.home) > 32) m.angry = false;
+        else if (d < m.aggro && h.dead <= 0) m.angry = true;
+        if (!m.angry) continue;
+        goal = ht.position;
+        speed = d > 1.9 ? m.speed : 0;
+        if (d < 2.4 && m.cd <= 0) {
+            m.cd = 2;
+            emit(Bite { amount = round(random(m.dmgMin, m.dmgMax)) });
+        }
+    }
+    if (!m.angry) {
+        // Out of combat: heal, wander near home.
+        m.hp = min(m.maxHp, m.hp + m.maxHp * 0.2 * dt);
+        m.think -= dt;
+        if (m.think <= 0) {
+            m.think = random(3, 7);
+            m.goal = m.home + vec3(random(-5, 5), 0, random(-5, 5));
+        }
+        if (dist(t.position, m.goal) < 0.6) speed = 0;
+    }
+    vec3 d = goal - t.position;
+    d.y = 0;
+    if (len(d) > 0.1 && speed > 0) {
+        d = normalize(d);
+        m.heading = atan2(-d.x, -d.z);
+    } else if (m.angry) {
+        // Standing in melee: keep facing the hero.
+        if (len(d) > 0.01) m.heading = atan2(-d.x, -d.z);
+        d = vec3(0, 0, 0);
+    } else d = vec3(0, 0, 0);
+    body.velocity.x = d.x * speed;
+    body.velocity.z = d.z * speed;
+    t.rotation = axisAngle(vec3(0, 1, 0), m.heading);
+}
+
+// Bites, XP, levels, death and resting.
+system HeroLife(Entity e, Hero& h, Transform3D& t, Msg& msg) {
+    for (Bite b : events<Bite>()) {
+        if (h.dead > 0) continue;
+        h.hp -= b.amount;
+        h.combat = 5;
+        floatText(t.position, "-" + b.amount, color("#ff5a4a"));
+    }
+    for (Killed k : events<Killed>()) {
+        h.xp += k.xp;
+        floatText(k.at, "+" + k.xp + " xp", color("#c58bff"));
+    }
+    for (Reward r : events<Reward>()) h.xp += r.xp;
+    while (h.xp >= xpNeed(h.level)) {
+        h.xp -= xpNeed(h.level);
+        h.level++;
+        h.hp = maxHp(h.level);
+        spawn("LevelUp", Transform3D { position = t.position });
+        say(msg, (msg.time > 0 ? msg.text + "\n" : "") + "You have reached level " + h.level + "!");
+    }
+    if (h.dead > 0) {
+        h.dead -= dt;
+        if (h.dead <= 0) {
+            t.position = GRAVE;
+            h.hp = maxHp(h.level);
+            say(msg, "You wake up at the abbey.");
+        }
+        return;
+    }
+    if (h.hp <= 0) {
+        h.hp = 0;
+        h.dead = 3;
+        h.target = none;
+        say(msg, "You have died.");
+        return;
+    }
+    if (h.combat <= 0) h.hp = min(maxHp(h.level), h.hp + maxHp(h.level) * 0.06 * dt);
+}
+
+// Walk cycle for every limb, weapon swing for the hero.
+system Limbs(Limb l, Parent p, Transform3D& t) {
+    float speed = has<RigidBody>(p.entity) ? len(vec2(get<RigidBody>(p.entity).velocity.x, get<RigidBody>(p.entity).velocity.z)) : 0;
+    t.rotation = euler(sin(time * 10 + l.phase) * l.amp * min(1, speed / 3), 0, 0);
+}
+
+system Swings(Weapon w, Parent p, Transform3D& t) {
+    float s = 0;
+    if (has<Hero>(p.entity)) s = get<Hero>(p.entity).swing;
+    if (has<Mob>(p.entity)) s = get<Mob>(p.entity).cd > 1.7 ? (get<Mob>(p.entity).cd - 1.7) / 0.3 : 0;
+    t.rotation = euler(-sin(s * PI) * 1.6, 0, 0);
+}

@@ -48,8 +48,8 @@ to the YAML file. Only the fields you write change; the rest keep the component 
 | Transform3D | position [0,0,0], rotation identity, scale [1,1,1] |
 | Timer | duration 1, time 0, repeat false, destroy false, done (true on the step it elapses; then stops, or restarts with repeat; destroy removes the entity) |
 | Particles | rate 10 (per s), burst 0 (emitted once, then reset), lifetime 1, speed 2, spread 0.785 (cone around +Y, radians; 6.3 = all directions), gravity 0, color/endColor white, size 0.2, endSize 0, max 100 |
-| Sprite | image '', size [1,1] (used without image), color white, pixelsPerUnit 100, layer 0 (higher on top), columns 1, rows 1, frame 0, flipX false |
-| Text | text '', size 0.5 (line height), color white, align left/center/right, layer 0, screen false (true: HUD over everything, Transform2D position in [-1,1] with y up, size in tenths of screen height) |
+| Sprite | image '', size [1,1] (used without image), color white, pixelsPerUnit 100, layer 0 (higher on top), columns 1, rows 1, frame 0, flipX false, align center (left/right: that edge sits at the position, e.g. a bar filled by scale.x), screen false (true: HUD like screen Text, also in 3D scenes) |
+| Text | text '', size 0.5 (line height), color white, align left/center/right, layer 0, screen false (true: HUD over everything, Transform2D position in [-1,1] with y up, size in tenths of screen height; text draws over sprites of the same layer), billboard false (true: 3D world text faces the camera) |
 | SpriteAnimation | frames [0], fps 10, loop true |
 | Tilemap | tiles [] (rows of characters, top first; Transform2D position = top-left corner), chars '#' (i-th char draws frame i of image, or a color square), passable '' (chars that don't collide), size 1 (tile meters), image '', columns 1, rows 1, color white, layer 0, friction 0.5. Solid tiles become a few static boxes |
 | Camera2D | height 10 (visible meters) |

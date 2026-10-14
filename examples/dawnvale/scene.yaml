@@ -1,0 +1,215 @@
+dimension: 3d
+scripts: [./game.tess]
+systems: [Grow, Unlock, HeroMove, HeroCombat, MobBrain, HeroLife, Credit, Use, Regrow, Limbs, Swings, CameraFollow, Floats, TargetRing, Markers, ShowPlayer, ShowTarget, Gauges, GaugeTexts, ShowQuests, ShowMessage]
+input:
+  move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
+  strafeLeft: [KeyQ]
+  strafeRight: [KeyE]
+  jump: [Space, PadA]
+  target: [Tab, PadRB]
+  select: [MouseLeft]
+  strike: [Digit1, PadX]
+  use: [KeyF, PadY]
+physics: { gravity: [0, -20] }
+resources:
+  Grown: {}
+  View: {}
+  Msg: { text: "Welcome to Dawnvale. Speak with Captain Rowan at the abbey gate (F).", time: 8 }
+
+prefabs:
+  Part:                          # one piece of a model; the .tess files set shape, size, color
+    Transform3D: {}
+    Mesh: {}
+  Pivot:                         # invisible joint that parts hang from (weapons swing around it)
+    Transform3D: {}
+  Wolf:
+    Transform3D: {}
+    RigidBody: { lockRotation: true }
+    Collider: { size: [0.6, 1, 1.2] }
+    Mob: { kind: wolf, label: Young Wolf, level: 1, hp: 45, maxHp: 45, dmgMin: 3, dmgMax: 6, xp: 45, speed: 5 }
+  Digger:
+    Transform3D: {}
+    RigidBody: { lockRotation: true }
+    Collider: { shape: capsule, size: [0.6, 1.2, 0.6] }
+    Mob: { kind: digger, label: Kobold Digger, level: 3, hp: 70, maxHp: 70, dmgMin: 5, dmgMax: 8, xp: 70, speed: 4 }
+  Foreman:
+    Transform3D: { scale: [1.6, 1.6, 1.6] }
+    RigidBody: { lockRotation: true }
+    Collider: { shape: capsule, size: [1, 1.9, 1] }
+    Mob: { kind: foreman, label: Grimtooth the Foreman, level: 5, hp: 320, maxHp: 320, dmgMin: 9, dmgMax: 14, xp: 350, speed: 4, aggro: 12, respawn: 40 }
+  Grapes:
+    Transform3D: {}
+    Mesh: { shape: cylinder, size: [0.7, 0.45, 0.7], color: '#8a6a45' }
+    Particles: { rate: 6, lifetime: 1.5, speed: 0.5, spread: 6.3, gravity: -0.8, color: '#fff3b0', endColor: '#ffd23f', size: 0.14, max: 12 }
+    Pickup: { item: grapes }
+  Marker:
+    Transform3D: {}
+    Text: { size: 0.9, align: center, color: '#ffd23f', billboard: true }
+    Marker: {}
+  Float:
+    Transform3D: {}
+    Text: { size: 0.45, align: center, billboard: true }
+    Float: {}
+    Timer: { duration: 1.1, destroy: true }
+  LevelUp:
+    Transform3D: {}
+    Particles: { rate: 0, burst: 80, lifetime: 1.4, speed: 3, spread: 0.6, gravity: -2, color: '#fff3b0', endColor: '#ffb43f', size: 0.2 }
+    Timer: { duration: 1.5, destroy: true }
+  Sparkle:
+    Transform3D: {}
+    Particles: { rate: 0, burst: 30, lifetime: 0.8, speed: 3, spread: 6.3, gravity: -1, color: '#fff3b0', endColor: '#c58bff', size: 0.12 }
+    Timer: { duration: 1, destroy: true }
+
+entities:
+  - name: Camera
+    Transform3D: { position: [0, 4, 20] }
+    Camera3D: { fov: 60, far: 160, background: '#9ccbf0', fog: 120, bloom: 0.15 }
+    Follow: {}
+  - name: Sun
+    Transform3D: { rotation: [-0.9, 0.5, 0] }
+    Light: { color: '#fff1d6', intensity: 2.4 }
+  - name: Sky
+    Light: { kind: ambient, color: '#b8d4ff', intensity: 0.9 }
+  - name: Ground
+    Transform3D: { position: [0, -0.5, 0] }
+    Mesh: { size: [260, 1, 260], color: '#5f9440' }
+    Collider: { size: [260, 1, 260] }
+  - name: Ring
+    Transform3D: { position: [0, -60, 0] }
+    Mesh: { shape: cylinder, size: [1.3, 0.03, 1.3], color: '#ffd23f', emissive: 0.8 }
+    Ring: {}
+
+  # People. Look describes the outfit; world.tess builds the model.
+  - name: Hero
+    Transform3D: { position: [0, 1, 12] }
+    RigidBody: { lockRotation: true }
+    Collider: { shape: capsule, size: [0.7, 1.8, 0.7] }
+    Hero: {}
+    Look: { shirt: '#8c939c', pants: '#3a3f4a', hair: '#c9a227', gear: sword }
+  - name: Rowan
+    Transform3D: { position: [-3, 0.9, 9], rotation: [0, 0.5, 0] }
+    Collider: { shape: capsule, size: [0.7, 1.8, 0.7] }
+    Npc: { id: rowan, label: Captain Rowan }
+    Look: { shirt: '#2d4f9e', pants: '#3a3f4a', hair: '#3a2a1a', gear: sword }
+  - name: Mira
+    Transform3D: { position: [3, 0.9, 6], rotation: [0, -0.6, 0] }
+    Collider: { shape: capsule, size: [0.7, 1.8, 0.7] }
+    Npc: { id: mira, label: Sister Mira }
+    Look: { shirt: '#f2efe6', hair: '#7a4a2a', gear: staff, robe: true }
+  - name: Tobbin
+    Transform3D: { position: [24, 0.9, 10], rotation: [0, 1.2, 0] }
+    Collider: { shape: capsule, size: [0.7, 1.8, 0.7] }
+    Npc: { id: tobbin, label: Farmer Tobbin }
+    Look: { shirt: '#9a6a3a', pants: '#4a5a3a', hair: '#9a9a9a', gear: pitchfork }
+  - name: Hale
+    Transform3D: { position: [3, 0.9, 64], rotation: [0, 2.6, 0] }
+    Collider: { shape: capsule, size: [0.7, 1.8, 0.7] }
+    Npc: { id: hale, label: Sergeant Hale }
+    Look: { shirt: '#2d4f9e', pants: '#3a3f4a', hair: '#1a1a1a', gear: sword }
+
+  # Camps: count copies of a prefab within radius.
+  - { name: WolvesWest, Transform3D: { position: [-34, 0.6, -4] }, Camp: { prefab: Wolf, count: 6, radius: 10 } }
+  - { name: WolvesNorth, Transform3D: { position: [-18, 0.6, -36] }, Camp: { prefab: Wolf, count: 4, radius: 7 } }
+  - { name: DiggersCamp, Transform3D: { position: [26, 0.8, -40] }, Camp: { prefab: Digger, count: 7, radius: 9 } }
+  - { name: DiggersField, Transform3D: { position: [44, 0.8, -24] }, Camp: { prefab: Digger, count: 4, radius: 6 } }
+  - { name: Boss, Transform3D: { position: [30, 1.6, -53] }, Camp: { prefab: Foreman, count: 1 } }
+  - { name: Vines, Transform3D: { position: [34, 0.22, 1] }, Camp: { prefab: Grapes, count: 8, radius: 7 } }
+
+  # Quests, in order. requires = order of the quest that unlocks this one.
+  - name: Q1
+    Quest:
+      order: 1
+      title: Wolves at the Gate
+      giver: rowan
+      turnIn: rowan
+      goal: kill
+      target: wolf
+      item: Young Wolves slain
+      need: 8
+      xp: 200
+      text: "Wolves have come down from the hills and prowl\nthe meadow west of the abbey. Slay 8 Young Wolves."
+      done: "Well fought. The brothers can walk the meadow again."
+  - name: Q2
+    Quest:
+      order: 2
+      requires: 1
+      title: Kobold Diggers
+      giver: rowan
+      turnIn: rowan
+      goal: kill
+      target: digger
+      item: Kobold Diggers slain
+      need: 10
+      xp: 300
+      text: "Kobolds are tunneling under the northeast hills.\nDrive them back: slay 10 Kobold Diggers."
+      done: "That will slow their digging. You learn fast."
+  - name: Q3
+    Quest:
+      order: 3
+      requires: 1
+      title: Stolen Candles
+      giver: mira
+      turnIn: mira
+      goal: loot
+      target: digger
+      chance: 0.6
+      item: Wax Candles
+      need: 8
+      xp: 300
+      text: "The kobolds stole our chapel candles and wear them\non their heads! Bring back 8 Wax Candles."
+      done: "Bless you. The chapel will be bright tonight."
+  - name: Q4
+    Quest:
+      order: 4
+      title: The Grape Harvest
+      giver: tobbin
+      turnIn: tobbin
+      goal: gather
+      target: grapes
+      item: Grape Baskets
+      need: 6
+      xp: 250
+      text: "My back is not what it was. Pick up 6 baskets\nof grapes in the vineyard behind me (F)."
+      done: "Fine grapes! The abbey wine will be good this year."
+  - name: Q5
+    Quest:
+      order: 5
+      requires: 2
+      title: Report to the Sergeant
+      giver: rowan
+      turnIn: hale
+      goal: talk
+      item: Report
+      xp: 150
+      text: "Take my report to Sergeant Hale in Goldbrook,\ndown the south road."
+      done: "Rowan sent you? Good. I have work for a sword like yours."
+  - name: Q6
+    Quest:
+      order: 6
+      requires: 5
+      title: Grimtooth
+      giver: hale
+      turnIn: hale
+      goal: kill
+      target: foreman
+      item: Grimtooth slain
+      need: 1
+      xp: 600
+      text: "The kobolds answer to a brute called Grimtooth who\nguards the mine mouth. End him."
+      done: "Grimtooth is dead? The valley owes you, hero."
+
+  # HUD: screen sprites (panels, bars) under screen texts. x in [-1, 1], sizes in tenths of the screen height.
+  - { name: PlayerPanel, Transform2D: { position: [-0.98, 0.84] }, Sprite: { screen: true, align: left, size: [4.4, 1.5], color: [0, 0, 0, 0.5] } }
+  - { name: PlayerHud, Transform2D: { position: [-0.96, 0.93] }, Text: { screen: true, align: left, size: 0.38, color: '#fff3d6', layer: 2 }, PlayerFrame: {} }
+  - { name: HpBack, Transform2D: { position: [-0.96, 0.845] }, Sprite: { screen: true, align: left, size: [4, 0.32], color: '#3a1010', layer: 1 } }
+  - { name: HpFill, Transform2D: { position: [-0.96, 0.845] }, Sprite: { screen: true, align: left, size: [4, 0.32], color: '#3fbf4f', layer: 1 }, Bar: { of: hp } }
+  - { name: HpText, Transform2D: { position: [-0.95, 0.845] }, Text: { screen: true, align: left, size: 0.26, layer: 2 }, Bar: { of: hpText } }
+  - { name: XpBack, Transform2D: { position: [-0.96, 0.775] }, Sprite: { screen: true, align: left, size: [4, 0.2], color: '#1a1030', layer: 1 } }
+  - { name: XpFill, Transform2D: { position: [-0.96, 0.775] }, Sprite: { screen: true, align: left, size: [4, 0.2], color: '#a46bff', layer: 1 }, Bar: { of: xp } }
+  - { name: TargetPanel, Transform2D: { position: [-0.48, 0.84] }, Sprite: { screen: true, align: left, size: [4.4, 1.5], color: [0, 0, 0, 0.5] }, Bar: { of: targetPanel } }
+  - { name: TargetHud, Transform2D: { position: [-0.46, 0.93] }, Text: { screen: true, align: left, size: 0.38, layer: 2 }, TargetFrame: {} }
+  - { name: TargetBack, Transform2D: { position: [-0.46, 0.845] }, Sprite: { screen: true, align: left, size: [4, 0.32], color: '#3a1010', layer: 1 }, Bar: { of: targetBack } }
+  - { name: TargetFill, Transform2D: { position: [-0.46, 0.845] }, Sprite: { screen: true, align: left, size: [4, 0.32], color: '#d94a3a', layer: 1 }, Bar: { of: target } }
+  - { name: QuestHud, Transform2D: { position: [0.96, 0.6] }, Text: { screen: true, align: right, size: 0.36, color: '#ffe9a0', layer: 2 }, Tracker: {} }
+  - { name: MessageHud, Transform2D: { position: [0, -0.55] }, Text: { screen: true, align: center, size: 0.42, color: '#ffffff', layer: 2 }, Message: {} }
+  - { name: HelpHud, Transform2D: { position: [-0.96, -0.94] }, Text: { screen: true, align: left, size: 0.3, color: '#ffffff', layer: 2, text: "WASD move  Q/E strafe  Space jump  Tab or click: target  1 Strike  F talk/gather" } }

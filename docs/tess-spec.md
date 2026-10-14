@@ -67,7 +67,7 @@ Parameters are read-only; component and resource parameters may be `T&` (passed 
 `+ - * / %` (`+` with a string concatenates: `"Coins " + n`), `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
 
 Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (combine),
-`q * v` (rotate). Fields `.x .y .z .w`, `.r .g .b .a`.
+`q * v` (rotate); on a `color` these keep alpha (`c * 0.8` darkens). Fields `.x .y .z .w`, `.r .g .b .a`.
 
 ## Built-ins
 
@@ -92,7 +92,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,
 `Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `Timer {duration, time, repeat, destroy, done}`, `RigidBody {type, velocity, angularVelocity,
 gravityScale, linearDamping, lockRotation}`, `Collider {shape, size, sensor, friction,
-restitution, density}`, `Sprite`, `SpriteAnimation`, `Text {text, size, color, align, layer, screen}`, `Tilemap`, `Particles` (set `burst` to emit), `Mesh`, `Animator {clip, speed, loop, time}` (glTF clip of Mesh.model), `Light`, `Camera2D`, `Camera3D`.
+restitution, density}`, `Sprite` (`screen: true` + `align: "left"` + scale.x = HUD bar), `SpriteAnimation`, `Text {text, size, color, align, layer, screen, billboard}`, `Tilemap`, `Particles` (set `burst` to emit), `Mesh`, `Animator {clip, speed, loop, time}` (glTF clip of Mesh.model), `Light`, `Camera2D`, `Camera3D`.
 Engine event: `Collision {Entity a; Entity b; bool started; bool sensor;}`.
 
 Conventions: Y up, meters, radians, 3D forward is -Z.

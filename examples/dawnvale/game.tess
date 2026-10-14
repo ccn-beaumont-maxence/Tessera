@@ -1,0 +1,95 @@
+// Dawnvale: a small MMO-style starting valley. Six quests take a new adventurer from level 1 to 6.
+using "./common.tess";
+using "./world.tess";
+using "./combat.tess";
+using "./quests.tess";
+
+component Follow { float distance = 7.5; float height = 3.2; float sharpness = 5; }
+component PlayerFrame {}
+component TargetFrame {}
+component Tracker {}
+component Message {}
+component Bar { string of; }   // which HUD gauge this sprite or text shows
+
+system CameraFollow(Transform3D& t, Follow f, View& v) {
+    for (Entity e, Hero h, Transform3D p : query) {
+        vec3 head = p.position + vec3(0, 1.2, 0);
+        vec3 back = normalize(vec3(sin(h.heading), f.height / f.distance, cos(h.heading)));
+        float reach = len(vec2(f.distance, f.height));
+        RayHit hit = raycast(head, back, reach, e);   // walls and trunks pull the camera in
+        if (hit.entity != none) reach = max(hit.distance - 0.3, 1.2);
+        t.position = lerp(t.position, head + back * reach, min(1, dt * f.sharpness));
+        vec3 d = head - t.position;
+        v.yaw = atan2(-d.x, -d.z);
+        t.rotation = axisAngle(vec3(0, 1, 0), v.yaw) * axisAngle(vec3(1, 0, 0), atan2(d.y, len(vec2(d.x, d.z))));
+    }
+}
+
+system Floats(Float f, Transform3D& t) { t.position.y += f.rise * dt; }
+
+// The selection circle under the current target.
+system TargetRing(Ring r, Transform3D& t, Mesh& m) {
+    t.position = vec3(0, -60, 0);
+    for (Hero h : query)
+        if (h.target != none && alive(h.target)) {
+            Mob mob = get<Mob>(h.target);
+            vec3 p = get<Transform3D>(h.target).position;
+            t.position = vec3(p.x, 0.05, p.z);
+            float s = mob.kind == "foreman" ? 1.8 : 1.3;
+            m.size = vec3(s, 0.03, s);
+            m.color = mob.angry ? color("#ff4d3d") : color("#ffd23f");
+        }
+}
+
+string bar(float k, int n) {
+    string s = "";
+    for (int i = 0; i < n; i++) s = s + (i < round(k * n) ? "|" : ".");
+    return s;
+}
+
+system ShowPlayer(PlayerFrame f, Text& text) {
+    for (Hero h : query) text.text = "Adventurer   level " + h.level;
+}
+
+system ShowTarget(TargetFrame f, Text& text) {
+    text.text = "";
+    for (Hero h : query)
+        if (h.target != none && alive(h.target)) {
+            Mob m = get<Mob>(h.target);
+            text.text = m.label + "  " + m.level + (m.kind == "foreman" ? " Elite" : "");
+            text.color = m.angry ? color("#ff8a7a") : color("#ffe9a0");
+        }
+}
+
+// Gauges: fill sprites scale with their value; target ones hide without a target.
+system Gauges(Bar b, Transform2D& t, Sprite& s) {
+    for (Hero h : query) {
+        bool targeted = h.target != none && alive(h.target);
+        float k = 1;
+        if (b.of == "hp") k = h.hp / maxHp(h.level);
+        if (b.of == "xp") k = h.xp * 1.0 / xpNeed(h.level);
+        if (b.of == "target" && targeted) k = max(get<Mob>(h.target).hp, 0) / get<Mob>(h.target).maxHp;
+        t.scale.x = clamp(k, 0, 1);
+        if (b.of == "target" || b.of == "targetBack") s.color.a = targeted ? 1 : 0;
+        if (b.of == "targetPanel") s.color.a = targeted ? 0.5 : 0;
+    }
+}
+
+system GaugeTexts(Bar b, Text& text) {
+    for (Hero h : query) text.text = round(h.hp) + " / " + round(maxHp(h.level));
+}
+
+system ShowQuests(Tracker tr, Text& text) {
+    string s = "";
+    for (Quest q : query) {
+        if (q.state == ACTIVE) s = s + q.title + "\n  " + q.item + " " + q.have + "/" + q.need + "\n";
+        if (q.state == READY) s = s + q.title + "\n  Complete: see " + labelOf(q.turnIn) + "\n";
+    }
+    text.text = s;
+}
+
+system ShowMessage(Message mm, Text& text, Msg& msg) {
+    msg.time = max(msg.time - dt, 0);
+    text.text = msg.text;
+    text.color.a = min(1, msg.time);
+}

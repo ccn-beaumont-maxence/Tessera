@@ -172,3 +172,8 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 - [x] `examples/forest` (forêt procédurale de nuit, lucioles, champignons lumineux, quête des feux follets)
 - [x] Rendu : `Mesh.emissive`, formes low-poly `cone` et `ico`, `Camera3D.background`, `fog`, `bloom`
 - [x] Déployée sur GitHub Pages (`.github/workflows/pages.yml`), lien dans le README
+
+## Phase 22 : Démo Dawnvale (MMO)
+- [x] `examples/dawnvale` : vallée de départ type MMO, 6 quêtes chaînées (tuer, butin, cueillette, livraison, boss), niveaux 1 à 6
+- [x] Moteur : `Text.billboard`, `Sprite.screen` + `align` (barres de HUD), maths de couleur qui gardent l'alpha
+- [x] Publiée sur GitHub Pages sous `/dawnvale/`
