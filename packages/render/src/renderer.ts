@@ -22,6 +22,10 @@ import {
   type World,
 } from '@tessera/core';
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { Animator, Camera2D, Camera3D, Light, Mesh, Sprite, Text } from './components';
 
@@ -134,6 +138,7 @@ const UNIT: Record<string, () => THREE.BufferGeometry> = {
   plane: () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
   capsule: () => new THREE.CapsuleGeometry(0.5, 1, 8, 16),
   cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
+  cone: () => new THREE.ConeGeometry(0.5, 1, 24),
 };
 
 const ORIGIN2 = Transform2D.create();
@@ -158,11 +163,22 @@ export class Renderer {
   private readonly tilemaps = new Map<Entity, TilemapNode>();
   private readonly particles = new Map<Entity, ParticleNode>();
   private readonly dummy = new THREE.Object3D();
+  private readonly background = new THREE.Color(0x1b1d26);
+  private readonly fog = new THREE.Fog(this.background, 0, 1);
   private readonly tint = new THREE.Color();
   /** Screen-space overlay (Text with `screen: true`), drawn after the scene. */
   private readonly hud = new THREE.Scene();
   private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
   private stamp = 0;
+  /** Created on the first frame a Camera3D asks for bloom. */
+  private post?: {
+    composer: EffectComposer;
+    scene: RenderPass;
+    bloom: UnrealBloomPass;
+    w: number;
+    h: number;
+  };
+  private bloom = 0;
   private readonly w2 = Transform2D.create();
   private readonly up2 = Transform2D.create();
   private readonly w3 = Transform3D.create();
@@ -177,7 +193,7 @@ export class Renderer {
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
     this.gl.setPixelRatio(globalThis.devicePixelRatio ?? 1);
     this.gl.shadowMap.enabled = true;
-    this.scene.background = new THREE.Color(0x1b1d26);
+    this.scene.background = this.background;
     const sun = new THREE.DirectionalLight(0xffffff, 2);
     sun.position.set(5, 10, 7);
     sun.castShadow = true;
@@ -219,7 +235,8 @@ export class Renderer {
     this.syncTexts(alpha);
     const camera = this.camera(alpha);
     this.syncParticles(camera);
-    this.gl.render(this.scene, camera);
+    if (this.bloom > 0) this.postProcess(camera);
+    else this.gl.render(this.scene, camera);
     if (this.hud.children.length > 0) {
       this.gl.autoClear = false;
       this.gl.clearDepth();
@@ -324,6 +341,8 @@ export class Renderer {
         mat.transparent = m.color.a < 1;
         mat.roughness = m.roughness;
         mat.metalness = m.metalness;
+        mat.emissive.copy(mat.color);
+        mat.emissiveIntensity = m.emissive;
       }
       const { scale } = this.place3(e, t, alpha, n.obj);
       n.obj.scale.set(scale.x * m.size.x, scale.y * m.size.y, scale.z * m.size.z);
@@ -636,15 +655,45 @@ export class Renderer {
       return o;
     }
     const cam = this.perspective;
+    this.bloom = 0;
     this.world.each([Transform3D, Camera3D], (e, t, c) => {
       cam.fov = c.fov;
       cam.near = c.near;
       cam.far = c.far;
       this.place3(e, t, alpha, cam);
+      setColor(this.background, c.background);
+      this.fog.color.copy(this.background);
+      this.scene.fog = c.fog > 0 ? this.fog : null;
+      this.fog.far = c.fog;
+      this.fog.near = c.fog * 0.3;
+      this.bloom = c.bloom;
     });
     cam.aspect = aspect;
     cam.updateProjectionMatrix();
     return cam;
+  }
+
+  private postProcess(camera: THREE.Camera): void {
+    const size = this.gl.getSize(this.size);
+    if (!this.post) {
+      const composer = new EffectComposer(this.gl);
+      const scene = new RenderPass(this.scene, camera);
+      const bloom = new UnrealBloomPass(size.clone(), 1, 0.4, 0.6);
+      composer.addPass(scene);
+      composer.addPass(bloom);
+      composer.addPass(new OutputPass());
+      this.post = { composer, scene, bloom, w: 0, h: 0 };
+    }
+    const p = this.post;
+    if (p.w !== size.x || p.h !== size.y) {
+      p.w = size.x;
+      p.h = size.y;
+      p.composer.setPixelRatio(this.gl.getPixelRatio());
+      p.composer.setSize(size.x, size.y);
+    }
+    p.scene.camera = camera;
+    p.bloom.strength = this.bloom;
+    p.composer.render();
   }
 
   private resize(): void {

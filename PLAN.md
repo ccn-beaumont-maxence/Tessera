@@ -167,3 +167,8 @@ L'exécution réelle (cases ci-dessus) attend une clé `ANTHROPIC_API_KEY`.
 
 ## Phase 20 : Sauvegarde
 - [x] `save(key, value)` / `load(key, default)`, localStorage ou mémoire en headless
+
+## Phase 21 : Démo technique
+- [x] `examples/forest` (forêt procédurale de nuit, lucioles, champignons lumineux, quête des feux follets)
+- [x] Rendu : `Mesh.emissive`, forme `cone`, `Camera3D.background`, `fog`, `bloom`
+- [x] Déployée sur GitHub Pages (`.github/workflows/pages.yml`), lien dans le README

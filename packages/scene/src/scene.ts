@@ -149,7 +149,8 @@ function convert(def: unknown, val: unknown, loc: Loc, label: string, io: SceneI
   const o = def as Record<string, unknown>;
   const keys = Object.keys(o);
   const sig = keys.join('');
-  if (sig === 'rgba') {
+  // Objects ({r, g, b, a} from code like Tess `spawn`) take the field-by-field path below.
+  if (sig === 'rgba' && (typeof val !== 'object' || Array.isArray(val))) {
     if (typeof val === 'string') return color.hex(val, o as never);
     if (Array.isArray(val) && val.length >= 3 && val.every((n) => typeof n === 'number')) {
       return Object.assign(o, { r: val[0], g: val[1], b: val[2], a: val[3] ?? 1 });
