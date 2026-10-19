@@ -30,6 +30,25 @@ pnpm test                                   # all tests, including TS/Tess parit
 pnpm bench --oracle                         # validate the benchmark offline; `pnpm bench` needs ANTHROPIC_API_KEY
 ```
 
+## Your own (private) game
+
+`new-project.sh` creates a standalone game repo with this engine as a git submodule in
+`engine/`, a starter game copied from `platformer` (2D) or `arena` (3D), a smoke test, agent
+instructions (`AGENTS.md`/`CLAUDE.md`) and the MCP config. Your game stays in its own repo,
+so it can be private while the engine stays public.
+
+```sh
+./new-project.sh ~/games/my-game 3d         # or 2d (default); installs, checks, commits
+cd ~/games/my-game
+gh repo create my-game --private --source . --push
+
+pnpm dev                                    # play game/scene.yaml in the browser
+pnpm exec tess run game/scene.yaml --frames 120 --dump
+pnpm test
+git submodule update --remote engine && pnpm install   # upgrade the engine
+git clone --recurse-submodules <your private repo>     # clone elsewhere, then pnpm install
+```
+
 ## MCP server
 
 Lets an agent inspect and drive a running game (open, state, inspect, set, step, input,
