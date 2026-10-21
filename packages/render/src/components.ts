@@ -33,8 +33,11 @@ export const Camera3D = component('Camera3D', () => ({
   bloom: 0,
 }));
 
-/** Orthographic camera; `height` is the visible world height in meters. */
-export const Camera2D = component('Camera2D', () => ({ height: 10 }));
+/**
+ * Orthographic camera; `height` is the visible world height in meters. If `width` > 0, the view
+ * also always shows at least `width` meters across (zooms out on narrow screens).
+ */
+export const Camera2D = component('Camera2D', () => ({ height: 10, width: 0 }));
 
 /**
  * 2D sprite. With `image`, its size is the frame size in pixels / pixelsPerUnit;

@@ -34,7 +34,7 @@ export function mouse(world: World, out = vec2()): Vec2 {
     const c = world.get(e, Camera2D);
     if (!c || !world.has(e, Transform2D)) continue;
     const t = worldTransform2D(world, e, pose2);
-    half = c.height / 2;
+    half = Math.max(c.height, c.width / aspect(world)) / 2;
     cx = t.position.x;
     cy = t.position.y;
     break;
