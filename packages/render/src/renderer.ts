@@ -657,7 +657,7 @@ export class Renderer {
       let x = 0;
       let y = 0;
       this.world.each([Transform2D, Camera2D], (e, t, c) => {
-        half = c.height / 2;
+        half = Math.max(c.height, c.width / aspect) / 2;
         const { position } = this.pose2(e, t, alpha);
         x = position.x;
         y = position.y;

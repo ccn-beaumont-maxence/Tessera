@@ -27,6 +27,19 @@ describe('pointer in the world', () => {
     expect(m.y).toBeCloseTo(0);
   });
 
+  it('contain-fits the Camera2D width × height box at any aspect', () => {
+    const w = at({ x: 1, y: 1 });
+    const cam = w.spawn();
+    w.add(cam, Transform2D);
+    w.add(cam, Camera2D, { height: 10, width: 5.6 });
+    expect(mouse(w)).toEqual({ x: (5 * 16) / 9, y: 5 }); // landscape: height wins
+    const s = w.resourceList().find(([t]) => t.name === 'Input')?.[1] as { aspect: number };
+    s.aspect = 390 / 844;
+    const m = mouse(w);
+    expect(m.x).toBeCloseTo(2.8); // portrait: width wins
+    expect(m.y).toBeCloseTo(2.8 / s.aspect);
+  });
+
   it('casts a ray from the 3D camera through the pointer', () => {
     const w = at({ x: 0, y: 0 });
     const r = mouseRay(w);

@@ -52,7 +52,7 @@ to the YAML file. Only the fields you write change; the rest keep the component 
 | Text | text '', size 0.5 (line height), color white, align left/center/right, layer 0, screen false (true: HUD over everything, Transform2D position in [-1,1] with y up, size in tenths of screen height; text draws over sprites of the same layer), billboard false (true: 3D world text faces the camera) |
 | SpriteAnimation | frames [0], fps 10, loop true |
 | Tilemap | tiles [] (rows of characters, top first; Transform2D position = top-left corner), chars '#' (i-th char draws frame i of image, or a color square), passable '' (chars that don't collide), size 1 (tile meters), image '', columns 1, rows 1, color white, layer 0, friction 0.5. Solid tiles become a few static boxes |
-| Camera2D | height 10 (visible meters) |
+| Camera2D | height 10 (visible meters), width 0 (if > 0, also always shows at least this many meters across) |
 | Mesh | shape box/sphere/plane/capsule/cylinder/cone/ico (cone, ico: faceted low-poly), size [1,1,1], color white, roughness 0.8, metalness 0, emissive 0 (glow in its color), model '' (glTF path) |
 | Animator | clip '' (name in Mesh.model's glTF; '' = first clip), speed 1, loop true, time 0 (advanced by the simulation) |
 | Camera3D | fov 60, near 0.1, far 1000, background '#1b1d26', fog 0 (meters to fade into background; 0 = off), bloom 0 (glow of bright/emissive colors; 0 = off) |
