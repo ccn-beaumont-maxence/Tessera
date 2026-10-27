@@ -5,20 +5,20 @@ code in **Tess** (C++-flavored, compiled to TypeScript) or TypeScript. See [PLAN
 the language spec in [docs/tess-spec.md](docs/tess-spec.md) and the scene format in
 [docs/scenes.md](docs/scenes.md). Agent instructions: [AGENTS.md](AGENTS.md).
 
-**[All demos](https://beaumont-maxence.github.io/tessera/)** · **[Play The Whispering Wood](https://beaumont-maxence.github.io/tessera/forest/)**: walk a
+**[All demos](https://ccn-beaumont-maxence.github.io/Tessera/)** · **[Play The Whispering Wood](https://ccn-beaumont-maxence.github.io/Tessera/forest/)**: walk a
 night forest with a lantern and gather twelve wisps (WASD, Shift, Space). About 300 lines of
 YAML and Tess in [examples/forest](examples/forest): seeded procedural forest of low-poly models built from primitives, glowing
 materials with bloom and fog, particles, point lights, hierarchy, physics, HUD and a saved best time.
 
-[![The Whispering Wood](docs/forest.png)](https://beaumont-maxence.github.io/tessera/forest/)
+[![The Whispering Wood](docs/forest.png)](https://ccn-beaumont-maxence.github.io/Tessera/forest/)
 
-**[Play Dawnvale](https://beaumont-maxence.github.io/tessera/dawnvale/)**: a small MMO-style
+**[Play Dawnvale](https://ccn-beaumont-maxence.github.io/Tessera/dawnvale/)**: a small MMO-style
 starting valley. Six chained quests (slay, loot, gather, deliver, a boss) take you from level 1
 to 6; Tab or click to target, auto-attack, `1` to Strike, `F` to talk. Quests, people and mob
 camps are data in [scene.yaml](examples/dawnvale/scene.yaml); the rules are split by feature
 into [Tess files](examples/dawnvale) (world, combat, quests, HUD).
 
-[![Dawnvale](docs/dawnvale.png)](https://beaumont-maxence.github.io/tessera/dawnvale/)
+[![Dawnvale](docs/dawnvale.png)](https://ccn-beaumont-maxence.github.io/Tessera/dawnvale/)
 
 ```sh
 pnpm install
