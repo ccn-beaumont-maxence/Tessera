@@ -1,6 +1,6 @@
 dimension: 3d
 scripts: [./game.tess]
-systems: [Grow, Unlock, HeroMove, HeroCombat, MobBrain, HeroLife, Credit, Use, Regrow, Limbs, Swings, CameraFollow, Floats, TargetRing, Markers, ShowPlayer, ShowTarget, Gauges, GaugeTexts, ShowQuests, ShowMessage]
+systems: [Grow, Unlock, HeroMove, HeroCombat, MobBrain, HeroLife, Credit, Use, Regrow, Limbs, Swings, CameraFollow, Floats, TargetRing, Markers, ShowPlayer, ShowTarget, Gauges, GaugeTexts, ShowQuests, ShowMessage, ShowHelp]
 input:
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW, ArrowUp], down: [KeyS, ArrowDown], stick: PadLeft }
   strafeLeft: [KeyQ]
@@ -11,6 +11,7 @@ input:
   strike: [Digit1, PadX]
   use: [KeyF, PadY]
 physics: { gravity: [0, -20] }
+strings: { ja: ./ja.yaml, ko: ./ko.yaml }
 resources:
   Grown: {}
   View: {}
@@ -212,4 +213,4 @@ entities:
   - { name: TargetFill, Transform2D: { position: [-0.46, 0.845] }, Sprite: { screen: true, align: left, size: [4, 0.32], color: '#d94a3a', layer: 1 }, Bar: { of: target } }
   - { name: QuestHud, Transform2D: { position: [0.96, 0.6] }, Text: { screen: true, align: right, size: 0.36, color: '#ffe9a0', layer: 2 }, Tracker: {} }
   - { name: MessageHud, Transform2D: { position: [0, -0.55] }, Text: { screen: true, align: center, size: 0.42, color: '#ffffff', layer: 2 }, Message: {} }
-  - { name: HelpHud, Transform2D: { position: [-0.96, -0.94] }, Text: { screen: true, align: left, size: 0.3, color: '#ffffff', layer: 2, text: "WASD move  Q/E strafe  Space jump  Tab or click: target  1 Strike  F talk/gather" } }
+  - { name: HelpHud, Transform2D: { position: [-0.96, -0.94] }, Text: { screen: true, align: left, size: 0.3, color: '#ffffff', layer: 2 }, Help: {} }

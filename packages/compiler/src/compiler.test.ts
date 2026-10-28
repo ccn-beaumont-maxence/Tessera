@@ -2,6 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type ComponentType,
+  Strings,
   type System,
   Timer,
   Timers,
@@ -184,6 +185,22 @@ system Keep(Best& b) {
     w.step();
     w.step();
     expect(w.resourceList()[0]?.[1]).toEqual({ score: 5 });
+  });
+
+  it('translates text with tr()', async () => {
+    const m = await load(`
+resource Label { string text; }
+system Show(Label& l) { l.text = tr("Coins {0} of {1}", 3, "ten"); }
+`);
+    const w = new World();
+    w.resource(Strings).tables = { ja: { 'Coins {0} of {1}': '{1}枚中{0}枚' } };
+    w.resource(Strings).lang = 'ja';
+    w.addSystem(sys(m, 'Show'));
+    w.step();
+    expect(w.resourceList().find(([t]) => t.name === 'Label')?.[1]).toEqual({ text: 'ten枚中3枚' });
+    expect(err('void f() { string s = tr("x {0}", vec2(1, 2)); }')).toContain(
+      'tr() fills {0}, {1}... with numbers, strings or bools, got vec2',
+    );
   });
 
   it('drives eased motion from a Timer', async () => {

@@ -62,6 +62,8 @@ export interface Parsed {
   systems: string[];
   input: Record<string, unknown> | null;
   physics: { gravity?: number[] } | null;
+  /** Language code -> source text -> translation. */
+  strings: Record<string, Record<string, string>>;
   resources: Spec;
   prefabs: Record<string, { spec: Spec; loc: Loc }>;
   entities: EntityDef[];
@@ -77,6 +79,7 @@ const TOP_KEYS = [
   'systems',
   'input',
   'physics',
+  'strings',
   'resources',
   'prefabs',
   'entities',
@@ -140,6 +143,27 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
   }
   if (input !== null && !isObj(input))
     return loc.at('input').fail('input must map action names to buttons');
+
+  const strings: Parsed['strings'] = {};
+  const rawStrings = data.strings ?? {};
+  if (!isObj(rawStrings))
+    return loc
+      .at('strings')
+      .fail('strings maps languages to translation files: strings: { ja: ./ja.yaml }');
+  for (const [lang, v] of Object.entries(rawStrings)) {
+    let table = v;
+    let at = loc.at('strings', lang);
+    if (typeof v === 'string') {
+      const file = join(dir, v);
+      files.push(file);
+      ({ data: table, loc: at } = await readYaml(file, io));
+    }
+    if (!isObj(table) || !Object.values(table).every((t) => typeof t === 'string'))
+      return at.fail(
+        `strings ${lang}: map each source text to its translation ("Coins {0}": "コイン {0}")`,
+      );
+    strings[lang] = table as Record<string, string>;
+  }
 
   const physics = data.physics ?? null;
   if (physics !== null && !isObj(physics))
@@ -213,6 +237,7 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
     systems: list('systems'),
     input: input as Record<string, unknown> | null,
     physics: physics as Parsed['physics'],
+    strings,
     resources: toSpec(resources, loc.at('resources')),
     prefabs,
     entities,

@@ -139,7 +139,7 @@ system HeroLife(Entity e, Hero& h, Transform3D& t, Msg& msg) {
     }
     for (Killed k : events<Killed>()) {
         h.xp += k.xp;
-        floatText(k.at, "+" + k.xp + " xp", color("#c58bff"));
+        floatText(k.at, tr("+{0} xp", k.xp), color("#c58bff"));
     }
     for (Reward r : events<Reward>()) h.xp += r.xp;
     while (h.xp >= xpNeed(h.level)) {
@@ -147,14 +147,14 @@ system HeroLife(Entity e, Hero& h, Transform3D& t, Msg& msg) {
         h.level++;
         h.hp = maxHp(h.level);
         spawn("LevelUp", Transform3D { position = t.position });
-        say(msg, (msg.time > 0 ? msg.text + "\n" : "") + "You have reached level " + h.level + "!");
+        say(msg, (msg.time > 0 ? msg.text + "\n" : "") + tr("You have reached level {0}!", h.level));
     }
     if (h.dead > 0) {
         h.dead -= dt;
         if (h.dead <= 0) {
             t.position = GRAVE;
             h.hp = maxHp(h.level);
-            say(msg, "You wake up at the abbey.");
+            say(msg, tr("You wake up at the abbey."));
         }
         return;
     }
@@ -162,7 +162,7 @@ system HeroLife(Entity e, Hero& h, Transform3D& t, Msg& msg) {
         h.hp = 0;
         h.dead = 3;
         h.target = none;
-        say(msg, "You have died.");
+        say(msg, tr("You have died."));
         return;
     }
     if (h.combat <= 0) h.hp = min(maxHp(h.level), h.hp + maxHp(h.level) * 0.06 * dt);

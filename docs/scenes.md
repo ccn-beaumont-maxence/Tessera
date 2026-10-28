@@ -11,6 +11,7 @@ input:                        # named actions (or a path: ./input.yaml)
   move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], up: [KeyW], down: [KeyS], stick: PadLeft }
   jump: [Space, PadA]         # KeyboardEvent.code, MouseLeft/Right/Middle (touch = MouseLeft), PadA PadB PadX PadY PadLB PadRB PadLT PadRT PadStart PadUp...
 physics: { gravity: [0, -20] }
+strings: { ja: ./ja.yaml }    # translations for tr(): "Coins {0}": "コイン {0}"; ?lang=ja in the URL, else the browser language
 resources:
   Score: { lives: 3 }
 prefabs:                      # reusable component sets: inline or a path (./coin.yaml)
