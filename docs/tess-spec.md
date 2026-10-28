@@ -84,6 +84,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Events | `for (Collision c : events<Collision>()) { ... }` (last frame's), `emit(Hit { target = e })` |
 | Input | `down("jump")`, `pressed("jump")`, `released("jump")`, `axis("move")` (vec2, y up), `mouse()` (pointer in the 2D world, vec2), `mouseRay()` (3D: `Ray {origin, dir}` from the camera through the pointer) |
 | Physics | `raycast(origin, dir, maxDist, exclude = none)` returns `RayHit {entity, point, normal, distance}` (`entity == none`: no hit; vec2 fields in 2D), `for (Entity o : overlap("box", size, position)) { ... }` (Collider shapes) |
+| Terrain | `terrainHeight(x, z)`, `terrainNormal(x, z)` (vec3) of the Terrain surface as drawn, tracks included (0 and up outside any Terrain); `terrainTrack(from, to, width, depth)` presses a track from `from` to `to` (vec3, y ignored) with lips of pushed-aside material (snow, mud, sand, a wake): call it each step with the previous and current position |
 | Audio | `play("hit.wav", volume = 1, pitch = 1)` or `play("hit.wav", position, volume, pitch)` (3D sound heard from the camera) return an int id for `stop(id)`; `music("theme.ogg")` (`""` stops), `volume("music", 0.5)` (buses master, music, sfx) |
 | Scenes | `loadScene("level2.yaml", Score, ...)` at the end of the frame: everything is replaced except the listed resources (path relative to the current scene; list it under `scenes:`) |
 | Save | `save("best", score.best)`, `load("best", 0)` (type of the default; kept across runs in browsers) |
@@ -93,7 +94,7 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,
 `Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `Timer {duration, time, repeat, destroy, done}`, `RigidBody {type, velocity, angularVelocity,
 gravityScale, linearDamping, lockRotation}`, `Collider {shape, size, sensor, friction,
-restitution, density}`, `Sprite` (`screen: true` + `align: "left"` + scale.x = HUD bar), `SpriteAnimation`, `Text {text, size, color, align, layer, screen, billboard}`, `Tilemap`, `Particles` (set `burst` to emit), `Mesh`, `Animator {clip, speed, loop, time}` (glTF clip of Mesh.model), `Light`, `Camera2D`, `Camera3D`.
+restitution, density}`, `Sprite` (`screen: true` + `align: "left"` + scale.x = HUD bar), `SpriteAnimation`, `Text {text, size, color, align, layer, screen, billboard}`, `Tilemap`, `Terrain`, `Particles` (set `burst` to emit), `Mesh`, `Animator {clip, speed, loop, time}` (glTF clip of Mesh.model), `Light`, `Camera2D`, `Camera3D`.
 Engine event: `Collision {Entity a; Entity b; bool started; bool sensor;}`.
 
 Conventions: Y up, meters, radians, 3D forward is -Z.

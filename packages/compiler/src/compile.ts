@@ -1279,6 +1279,27 @@ class Compiler {
           ty: 'vec2',
           js: `${this.use('@tessera/render', 'mouse')}($w, ${this.scratchOf('vec2')})`,
         };
+      case 'terrainHeight': {
+        this.needsWorld(e, b, n);
+        const [x, z] = this.args(e, b, ['num', 'num']) as [R, R];
+        return { ty: 'float', js: `${core('terrainHeight')}($w, ${x.js}, ${z.js})` };
+      }
+      case 'terrainNormal': {
+        this.needsWorld(e, b, n);
+        const [x, z] = this.args(e, b, ['num', 'num']) as [R, R];
+        return {
+          ty: 'vec3',
+          js: `${core('terrainNormal')}($w, ${x.js}, ${z.js}, ${this.scratchOf('vec3')})`,
+        };
+      }
+      case 'terrainTrack': {
+        this.needsWorld(e, b, n);
+        const [from, to, width, depth] = this.args(e, b, ['vec3', 'vec3', 'num', 'num']) as R[];
+        return {
+          ty: 'void',
+          js: `${core('terrainTrack')}($w, ${this.obj(from as R)}, ${this.obj(to as R)}, ${width?.js}, ${depth?.js})`,
+        };
+      }
       case 'mouseRay':
         this.needsWorld(e, b, n);
         this.args(e, b, []);
@@ -1427,6 +1448,9 @@ class Compiler {
         'mouse',
         'mouseRay',
         'raycast',
+        'terrainHeight',
+        'terrainNormal',
+        'terrainTrack',
         'overlap',
         'play',
         'stop',

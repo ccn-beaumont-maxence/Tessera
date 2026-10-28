@@ -80,6 +80,10 @@ export class Physics2D extends Backend<R.RigidBody, R.Collider> {
     return this.rw.createCollider(desc, body);
   }
 
+  protected createMesh(): R.Collider {
+    throw new Error('Terrain is 3D only: use a Tilemap for 2D ground');
+  }
+
   protected removeBody(body: R.RigidBody): void {
     this.rw.removeRigidBody(body);
   }

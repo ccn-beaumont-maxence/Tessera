@@ -4,6 +4,7 @@ export * from './particles';
 export * from './rng';
 export * from './save';
 export * from './strings';
+export * from './terrain';
 export * from './tilemap';
 export * from './timer';
 export * from './transform';

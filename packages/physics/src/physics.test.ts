@@ -1,4 +1,13 @@
-import { Tilemap, Transform2D, Transform3D, vec2, vec3, World } from '@tessera/core';
+import {
+  Terrain,
+  Tilemap,
+  Transform2D,
+  Transform3D,
+  terrainAt,
+  vec2,
+  vec3,
+  World,
+} from '@tessera/core';
 import { dump, find, runFrames } from '@tessera/headless';
 import { describe, expect, it } from 'vitest';
 import { addPhysics, Collider, Collision, overlap, RigidBody, raycast } from './index';
@@ -173,5 +182,27 @@ describe('tilemap', () => {
     tiles.tiles = ['..........', '..........', '##########'];
     runFrames(w, 1);
     expect(raycast(w, vec2(-4.5, -0.5), vec2(0, -1))?.distance).toBeCloseTo(1.5);
+  });
+});
+
+describe('terrain', () => {
+  it('collides with the same surface terrainAt reports, and slides bodies downhill', async () => {
+    const w = new World();
+    await addPhysics(w, { dimension: '3d' });
+    const ground = w.spawn('Slope');
+    w.add(ground, Transform3D);
+    w.add(ground, Terrain, { size: vec2(40, 40), resolution: vec2(20, 20), slope: 0.3, seed: 1 });
+    runFrames(w, 1);
+    const hit = raycast(w, vec3(1.3, 50, -2.7), vec3(0, -1, 0));
+    expect(hit?.entity).toBe(ground);
+    expect(hit?.point.y).toBeCloseTo(terrainAt(w, 1.3, -2.7), 3);
+    const ball = w.spawn('Ball');
+    w.add(ball, Transform3D, { position: vec3(0, terrainAt(w, 0, 0) + 1, 0) });
+    w.add(ball, RigidBody);
+    w.add(ball, Collider, { shape: 'sphere', size: vec3(0.5, 0.5, 0.5) });
+    runFrames(w, 90);
+    const p = w.get(ball, Transform3D)?.position ?? vec3();
+    expect(p.z).toBeLessThan(-0.5); // rolled toward -z
+    expect(p.y).toBeCloseTo(terrainAt(w, p.x, p.z) + 0.25, 0);
   });
 });
