@@ -1,4 +1,14 @@
-import { type Entity, Tilemap, tileRects, type Vec2, type Vec3, type World } from '@tessera/core';
+import {
+  type Entity,
+  Terrain,
+  Tilemap,
+  Transform3D,
+  terrainMesh,
+  tileRects,
+  type Vec2,
+  type Vec3,
+  type World,
+} from '@tessera/core';
 import { Collider, Collision, RigidBody, type Shape } from './components';
 
 export interface RayHit {
@@ -52,6 +62,9 @@ export abstract class Backend<B extends Handle, C extends Handle> {
     { body: B; colliders: C[]; tiles: readonly string[]; size: number; friction: number }
   >();
 
+  /** Static triangle mesh per Terrain (3D), built once. */
+  private readonly grounds = new Map<Entity, { body: B; collider: C }>();
+
   abstract raycast(origin: Point, dir: Point, max: number, opts: RayOptions): RayHit | null;
   abstract overlap(shape: Shape, size: Point, position: Point): Entity[];
   /** Frees the Rapier world (WASM memory). */
@@ -67,6 +80,13 @@ export abstract class Backend<B extends Handle, C extends Handle> {
     y: number,
     hw: number,
     hh: number,
+    friction: number,
+  ): C;
+  /** Fixed triangle mesh in the body's frame (3D only). */
+  protected abstract createMesh(
+    body: B,
+    positions: Float32Array,
+    indices: Uint32Array,
     friction: number,
   ): C;
   protected abstract push(w: World, e: Entity, rec: Rec<B, C>): void;
@@ -131,6 +151,20 @@ export abstract class Backend<B extends Handle, C extends Handle> {
         return c;
       });
       this.maps.set(e, { body, colliders, tiles: t.tiles, size: t.size, friction: t.friction });
+    });
+    for (const [e, g] of this.grounds) {
+      if (w.alive(e) && w.get(e, Terrain)) continue;
+      this.owners.delete(g.collider.handle);
+      this.removeBody(g.body);
+      this.grounds.delete(e);
+    }
+    w.each([Transform3D, Terrain], (e, p, t) => {
+      if (this.grounds.has(e)) return;
+      const body = this.createBody(w, e, 'fixed');
+      const { positions, indices } = terrainMesh(t, p.position);
+      const collider = this.createMesh(body, positions, indices, t.friction);
+      this.owners.set(collider.handle, e);
+      this.grounds.set(e, { body, collider });
     });
   }
 

@@ -12,6 +12,7 @@ import {
   resource,
   Strings,
   type System,
+  Terrain,
   Tilemap,
   Timer,
   Timers,
@@ -57,6 +58,7 @@ const BUILTIN_COMPONENTS: Record<string, AnyComponent> = Object.fromEntries(
     Parent,
     Timer,
     Tilemap,
+    Terrain,
     Particles,
     Mesh,
     Animator,
@@ -229,7 +231,7 @@ async function prepare(parsed: Parsed, io: SceneIO): Promise<Prepared> {
 }
 
 const usesPhysics = (p: Parsed) =>
-  p.physics !== null || usesAny(p, ['RigidBody', 'Collider', 'Tilemap']);
+  p.physics !== null || usesAny(p, ['RigidBody', 'Collider', 'Tilemap', 'Terrain']);
 
 /**
  * Populates `world` from a parsed scene: resources, systems (in order), entities.

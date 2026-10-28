@@ -82,6 +82,18 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
     return this.rw.createCollider(desc, body);
   }
 
+  protected createMesh(
+    body: R.RigidBody,
+    positions: Float32Array,
+    indices: Uint32Array,
+    friction: number,
+  ) {
+    const desc = R.ColliderDesc.trimesh(positions, indices)
+      .setFriction(friction)
+      .setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    return this.rw.createCollider(desc, body);
+  }
+
   protected removeBody(body: R.RigidBody): void {
     this.rw.removeRigidBody(body);
   }

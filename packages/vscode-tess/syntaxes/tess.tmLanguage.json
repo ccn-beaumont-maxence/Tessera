@@ -58,7 +58,7 @@
         },
         {
           "name": "support.function.builtin.tess",
-          "match": "\\b(abs|min|max|clamp|floor|ceil|round|sqrt|pow|sin|cos|tan|atan2|lerp|len|dist|dot|cross|normalize|euler|axisAngle|random|randomInt|spawn|destroy|alive|has|get|add|remove|events|emit|down|pressed|released|axis|raycast|play|music|tr|log)\\b(?=\\s*[<(])"
+          "match": "\\b(abs|min|max|clamp|floor|ceil|round|sqrt|pow|sin|cos|tan|atan2|lerp|len|dist|dot|cross|normalize|euler|axisAngle|random|randomInt|spawn|destroy|alive|has|get|add|remove|events|emit|down|pressed|released|axis|raycast|terrainHeight|terrainNormal|terrainTrack|play|music|tr|log)\\b(?=\\s*[<(])"
         },
         {
           "name": "support.class.engine.tess",

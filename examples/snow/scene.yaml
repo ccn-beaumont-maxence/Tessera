@@ -1,0 +1,30 @@
+dimension: 3d
+scripts: [./game.tess]
+systems: [Steer, Carve, CameraFollow]
+input:
+  move: { left: [KeyA, ArrowLeft], right: [KeyD, ArrowRight], stick: PadLeft }
+physics: { gravity: [0, -9.81, 0] }
+prefabs:
+  Snow:                          # chunks share every setting, so they join without seams
+    Transform3D: {}
+    Terrain: { size: [40, 40], resolution: [24, 24], seed: 7, amplitude: 1.5, frequency: 0.06, slope: 0.35, color: '#eef3fb', steepColor: '#7d8796', steep: 0.55, friction: 0.05 }
+
+entities:
+  - name: Camera
+    Transform3D: { position: [0, 4, 8] }
+    Camera3D: { fov: 60, background: '#bcd3ee', fog: 70 }
+    Follow: {}
+  - name: Sun
+    Transform3D: { rotation: [-0.8, 0.4, 0] }
+    Light: { color: '#fff4e0', intensity: 2.2 }
+  - name: Sky
+    Light: { kind: ambient, color: '#c8dcff', intensity: 0.8 }
+  - { name: Slope0, prefab: Snow, Transform3D: { position: [0, 0, 0] } }
+  - { name: Slope1, prefab: Snow, Transform3D: { position: [0, 0, -40] } }
+  - { name: Slope2, prefab: Snow, Transform3D: { position: [0, 0, -80] } }
+  - name: Board
+    Transform3D: { position: [0, 8, 10] }
+    RigidBody: { lockRotation: true }
+    Collider: { shape: sphere, size: [0.5, 0.5, 0.5], friction: 0.05 }
+    Mesh: { size: [0.35, 0.08, 1.4], color: '#e2483d' }
+    Carver: {}

@@ -1,0 +1,32 @@
+// Snow: a board slides down Terrain chunks and leaves a track in the snow (A/D to steer).
+
+component Carver { vec3 last; bool down; float width = 0.3; float depth = 0.06; }
+component Follow {}
+
+system Steer(RigidBody& body) {
+    body.velocity.x = lerp(body.velocity.x, axis("move").x * 6, min(1, dt * 3));
+}
+
+// Dig from where the board was last step to where it is, while it touches the snow, and lay
+// the board on the slope, pointing where it slides.
+system Carve(Carver& c, Transform3D& t, RigidBody body) {
+    vec3 p = t.position;
+    bool touching = p.y - terrainHeight(p.x, p.z) < 0.6;
+    if (touching && c.down) terrainTrack(c.last, p, c.width, c.depth);
+    c.down = touching;
+    c.last = p;
+    vec3 up = vec3(0, 1, 0);
+    vec3 n = terrainNormal(p.x, p.z);
+    vec3 axis = cross(up, n);
+    quat tilt = len(axis) > 0.0001 ? axisAngle(normalize(axis), atan2(len(axis), dot(up, n))) : quat(0, 0, 0, 1);
+    t.rotation = tilt * axisAngle(up, atan2(-body.velocity.x, -body.velocity.z));
+}
+
+system CameraFollow(Transform3D& cam, Follow f) {
+    for (Carver c, Transform3D b : query) {
+        vec3 target = b.position + vec3(0, 3.5, 5);
+        cam.position = lerp(cam.position, target, min(1, dt * 8));
+        vec3 d = b.position - cam.position;
+        cam.rotation = axisAngle(vec3(0, 1, 0), atan2(-d.x, -d.z)) * axisAngle(vec3(1, 0, 0), atan2(d.y, len(vec2(d.x, d.z))));
+    }
+}

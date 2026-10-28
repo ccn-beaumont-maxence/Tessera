@@ -13,10 +13,17 @@ import {
   particlesOf,
   type Quat,
   quat,
+  Terrain,
+  type TerrainData,
   Tilemap,
   type TilemapData,
+  TRACK_STRIDE,
   Transform2D,
   Transform3D,
+  terrainFacet,
+  terrainMesh,
+  terrainTracks,
+  trackLife,
   type Vec3,
   vec3,
   type World,
@@ -92,6 +99,107 @@ function tileGeometry(t: DeepReadonly<TilemapData>): THREE.BufferGeometry {
   return g;
 }
 
+interface TerrainNode extends Node<THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>> {
+  /** Tracks drawn as raised strips (see trackSegment), grown as `terrainTrack` adds segments. */
+  tracks: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  drawn: number;
+}
+
+/** Flat-shaded triangles, each colored by its steepness. */
+function terrainGeometry(t: DeepReadonly<TerrainData>, origin: Vec3): THREE.BufferGeometry {
+  const { positions, indices } = terrainMesh(t, origin);
+  const pos = new Float32Array(indices.length * 3);
+  const col = new Float32Array(indices.length * 3);
+  const flat = new THREE.Color();
+  const steep = new THREE.Color();
+  setColor(flat, t.color);
+  setColor(steep, t.steepColor);
+  const minY = Math.cos(t.steep);
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  for (let i = 0; i < indices.length; i += 3) {
+    for (let k = 0; k < 3; k++) {
+      const v = (indices[i + k] as number) * 3;
+      pos.set(positions.subarray(v, v + 3), (i + k) * 3);
+    }
+    a.fromArray(pos, i * 3);
+    b.fromArray(pos, i * 3 + 3).sub(a);
+    c.fromArray(pos, i * 3 + 6).sub(a);
+    const face = b.cross(c).normalize().y < minY ? steep : flat;
+    for (let k = 0; k < 3; k++) face.toArray(col, (i + k) * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+
+/**
+ * Track profile across a segment: offset in half-widths and kind (0 edge, 1 lip, 2 floor). The
+ * floor is drawn just above the surface, between two lips (opaque ground would hide a floor
+ * drawn at its real depth); shading and `markColor` read as the cut.
+ */
+const PROFILE = [
+  [-2, 0],
+  [-1.5, 1],
+  [-1, 2],
+  [1, 2],
+  [1.5, 1],
+  [2, 0],
+] as const;
+/** Height of edges and floor above the surface, in track depths. */
+const LIFT = 0.02;
+/** Floats per track segment: 5 quads of 2 triangles. */
+const TRACK_FLOATS = (PROFILE.length - 1) * 6 * 3;
+
+/** Corners of each profile quad: (segment end, profile point offset). */
+const QUAD = [0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1];
+
+/**
+ * Writes track segment `k` (an offset into `segs`) at `at` in pos/col: depth faded by its
+ * life, floor blending from `mark` (fresh) to `base` (healed).
+ */
+function trackSegment(
+  t: DeepReadonly<TerrainData>,
+  origin: Vec3,
+  segs: readonly number[],
+  k: number,
+  now: number,
+  pos: Float32Array,
+  col: Float32Array,
+  at: number,
+  base: THREE.Color,
+  mark: THREE.Color,
+): void {
+  const x0 = segs[k] as number;
+  const z0 = segs[k + 1] as number;
+  const x1 = segs[k + 2] as number;
+  const z1 = segs[k + 3] as number;
+  const h = segs[k + 4] as number;
+  const life = trackLife(t, segs[k + 6] as number, now);
+  const depth = Math.abs(segs[k + 5] as number) * life;
+  const len = Math.hypot(x1 - x0, z1 - z0) || 1;
+  const sx = (z1 - z0) / len;
+  const sz = -(x1 - x0) / len;
+  let o = at;
+  for (let p = 0; p < PROFILE.length - 1; p++) {
+    for (let c = 0; c < QUAD.length; c += 2) {
+      const [side, kind] = PROFILE[p + (QUAD[c + 1] as number)] as readonly [number, number];
+      const x = (QUAD[c] ? x1 : x0) + sx * side * h;
+      const z = (QUAD[c] ? z1 : z0) + sz * side * h;
+      pos[o] = x - origin.x;
+      pos[o + 1] = terrainFacet(t, origin, x, z) - origin.y + (kind === 1 ? t.lip : LIFT) * depth;
+      pos[o + 2] = z - origin.z;
+      const m = kind === 2 ? life : 0;
+      col[o] = base.r + (mark.r - base.r) * m;
+      col[o + 1] = base.g + (mark.g - base.g) * m;
+      col[o + 2] = base.b + (mark.b - base.b) * m;
+      o += 3;
+    }
+  }
+}
+
 interface ParticleNode
   extends Node<THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>> {
   max: number;
@@ -165,11 +273,13 @@ export class Renderer {
   private readonly lights = new Map<Entity, Node<THREE.Light>>();
   private readonly texts = new Map<Entity, TextNode>();
   private readonly tilemaps = new Map<Entity, TilemapNode>();
+  private readonly terrains = new Map<Entity, TerrainNode>();
   private readonly particles = new Map<Entity, ParticleNode>();
   private readonly dummy = new THREE.Object3D();
   private readonly background = new THREE.Color(0x1b1d26);
   private readonly fog = new THREE.Fog(this.background, 0, 1);
   private readonly tint = new THREE.Color();
+  private readonly mark = new THREE.Color();
   /** Screen-space overlay (Text and Sprite with `screen: true`), drawn after the scene. */
   private readonly hud = new THREE.Scene();
   private readonly hudCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
@@ -235,6 +345,7 @@ export class Renderer {
     this.syncMeshes(alpha);
     this.syncSprites(alpha);
     this.syncTilemaps(alpha);
+    this.syncTerrains();
     this.syncLights(alpha);
     const camera = this.camera(alpha);
     this.syncTexts(alpha, camera);
@@ -511,6 +622,81 @@ export class Renderer {
     this.sweep(this.tilemaps);
   }
 
+  /** Terrains are static: built once at their position; tracks grow as they are made. */
+  private syncTerrains(): void {
+    this.world.each([Transform3D, Terrain], (e, t, m) => {
+      let n = this.terrains.get(e);
+      if (!n) {
+        const mat = new THREE.MeshStandardMaterial({ flatShading: true, vertexColors: true });
+        const obj = new THREE.Mesh(terrainGeometry(m, t.position), mat);
+        obj.receiveShadow = true;
+        obj.position.set(t.position.x, t.position.y, t.position.z);
+        const tracks = new THREE.Mesh(
+          new THREE.BufferGeometry(),
+          new THREE.MeshStandardMaterial({
+            flatShading: true,
+            vertexColors: true,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -4,
+            side: THREE.DoubleSide, // winding follows the track direction
+          }),
+        );
+        tracks.receiveShadow = true;
+        tracks.frustumCulled = false; // drawn range grows; the terrain bounds it anyway
+        obj.add(tracks);
+        this.scene.add(obj);
+        n = { obj, key: '', stamp: 0, tracks, drawn: 0 };
+        this.terrains.set(e, n);
+      }
+      n.stamp = this.stamp;
+      n.obj.material.roughness = n.tracks.material.roughness = m.roughness;
+      const segs = terrainTracks(this.world, e);
+      const count = segs.length / TRACK_STRIDE;
+      if (m.heal > 0) n.drawn = 0; // fading tracks change every frame (few: healed ones are pruned)
+      if (count > n.drawn || (m.heal > 0 && count === 0)) {
+        const g = n.tracks.geometry;
+        let pos = g.getAttribute('position') as THREE.BufferAttribute | undefined;
+        let col = g.getAttribute('color') as THREE.BufferAttribute | undefined;
+        if (!pos || !col || pos.array.length < count * TRACK_FLOATS) {
+          const cap = Math.max(256, 2 ** Math.ceil(Math.log2(count))) * TRACK_FLOATS;
+          const p = new Float32Array(cap);
+          const c = new Float32Array(cap);
+          if (pos && col) {
+            p.set(pos.array as Float32Array);
+            c.set(col.array as Float32Array);
+          }
+          pos = new THREE.BufferAttribute(p, 3).setUsage(THREE.DynamicDrawUsage);
+          col = new THREE.BufferAttribute(c, 3).setUsage(THREE.DynamicDrawUsage);
+          g.setAttribute('position', pos);
+          g.setAttribute('color', col);
+        }
+        setColor(this.tint, m.color);
+        setColor(this.mark, m.markColor);
+        for (let i = n.drawn; i < count; i++) {
+          trackSegment(
+            m,
+            t.position,
+            segs,
+            i * TRACK_STRIDE,
+            this.world.time,
+            pos.array as Float32Array,
+            col.array as Float32Array,
+            i * TRACK_FLOATS,
+            this.tint,
+            this.mark,
+          );
+        }
+        pos.addUpdateRange(n.drawn * TRACK_FLOATS, (count - n.drawn) * TRACK_FLOATS);
+        col.addUpdateRange(n.drawn * TRACK_FLOATS, (count - n.drawn) * TRACK_FLOATS);
+        pos.needsUpdate = col.needsUpdate = true;
+        g.setDrawRange(0, (count * TRACK_FLOATS) / 3);
+        n.drawn = count;
+      }
+    });
+    this.sweep(this.terrains);
+  }
+
   /** Particles are camera-facing quads; size and color blend over their life. */
   private syncParticles(camera: THREE.Camera): void {
     this.world.each([Particles], (e, p) => {
@@ -754,6 +940,11 @@ export class Renderer {
       const mat = n.obj.material as THREE.Material & { map?: THREE.Texture | null };
       mat.map?.dispose();
       mat.dispose();
+      for (const child of n.obj.children) {
+        if (!(child instanceof THREE.Mesh)) continue;
+        child.geometry.dispose();
+        (child.material as THREE.Material).dispose();
+      }
     }
   }
 }
