@@ -1369,6 +1369,22 @@ class Compiler {
           js: `${this.use('@tessera/scene', 'loadScene')}($w, ${p.js}, [${names.join(', ')}])`,
         };
       }
+      case 'tr': {
+        this.needsWorld(e, b, n);
+        const [text, ...rest] = e.args;
+        if (!text) return this.fail('tr needs a text: tr("Coins {0}", score.coins)', e);
+        const t = this.expr(text, b);
+        this.expectType(t, 'string', text);
+        const args = rest.map((a) => {
+          const v = this.expr(a, b);
+          if (!isNum(v.ty) && v.ty !== 'string' && v.ty !== 'bool')
+            this.fail(`tr() fills {0}, {1}... with numbers, strings or bools, got ${v.ty}`, a);
+          return v.js;
+        });
+        // ponytail: aliased because games name variables `tr` (other built-ins import unaliased).
+        this.use('@tessera/core', 'tr as $tr');
+        return { ty: 'string', js: `$tr($w, ${[t.js, ...args].join(', ')})` };
+      }
       case 'log':
         return {
           ty: 'void',
@@ -1419,6 +1435,7 @@ class Compiler {
         'loadScene',
         'save',
         'load',
+        'tr',
         'log',
         'euler',
         'axisAngle',

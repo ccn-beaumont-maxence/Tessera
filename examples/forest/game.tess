@@ -84,12 +84,12 @@ string clock(float seconds) {
 
 system ShowHud(Text& t, Hud h, Quest& q) {
     if (!q.won) q.time += dt;
-    t.text = "Wisps " + q.found + "/" + q.total + "   " + clock(q.time)
-        + (q.best > 0 ? "   best " + clock(q.best) : "")
-        + "\nWASD walk  Shift run  Space jump";
+    t.text = tr("Wisps {0}/{1}", q.found, q.total) + "   " + clock(q.time)
+        + (q.best > 0 ? "   " + tr("best {0}", clock(q.best)) : "")
+        + "\n" + tr("WASD walk  Shift run  Space jump");
 }
 
 system ShowTitle(Text& t, Title title, Quest q) {
-    t.text = q.won ? "The forest awakens" : "The Whispering Wood\nfind the twelve wisps";
+    t.text = q.won ? tr("The forest awakens") : tr("The Whispering Wood") + "\n" + tr("find the twelve wisps");
     t.color.a = q.won ? 1 : clamp(5 - time, 0, 1);
 }

@@ -10,6 +10,7 @@ import {
   quat,
   type ResourceType,
   resource,
+  Strings,
   type System,
   Tilemap,
   Timer,
@@ -252,11 +253,30 @@ export async function build(world: World, parsed: Parsed, io: SceneIO): Promise<
   instantiate(world, state.scenes.get(parsed.path) as Prepared);
 }
 
+/**
+ * Language for `strings:`: `?lang=` in the page URL, else the browser's languages. Headless
+ * runs keep the source text unless a test sets `Strings.lang`.
+ */
+function pickLang(available: string[]): string {
+  if (typeof document === 'undefined') return '';
+  const asked = new URLSearchParams(location.search).get('lang');
+  if (asked !== null) return available.includes(asked) ? asked : '';
+  for (const tag of navigator.languages) {
+    const l = tag.toLowerCase();
+    const found = available.find((a) => a === l || a === l.split('-')[0]);
+    if (found) return found;
+  }
+  return '';
+}
+
 function instantiate(world: World, { parsed, registry: r }: Prepared): void {
   const state = world.resource(SceneState);
   const io = state.io as SceneIO;
   Object.assign(state, { parsed, registry: r });
   state.entities.clear();
+  const strings = world.resource(Strings);
+  strings.tables = parsed.strings;
+  if (!strings.lang) strings.lang = pickLang(Object.keys(parsed.strings));
 
   for (const [name, fields] of Object.entries(parsed.resources)) {
     const type = r.resources[name] as ResourceType<unknown>;
@@ -387,6 +407,7 @@ export function reload(world: World, next: Parsed): boolean {
     if (!same(prev[k], next[k])) return false;
   }
 
+  world.resource(Strings).tables = next.strings;
   for (const [name, fields] of Object.entries(next.resources)) {
     const type = r.resources[name];
     const old = prev.resources[name] ?? {};

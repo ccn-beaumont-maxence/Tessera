@@ -11,7 +11,7 @@ bool finished(int order) {
 string labelOf(string id) {
     string label = id;
     for (Npc n : query) if (n.id == id) label = n.label;
-    return label;
+    return tr(label);
 }
 
 system Unlock(Quest& q) {
@@ -20,10 +20,10 @@ system Unlock(Quest& q) {
 
 void progress(Quest& q, Msg& msg, string what) {
     q.have++;
-    say(msg, what + " " + q.have + "/" + q.need);
+    say(msg, tr(what) + " " + q.have + "/" + q.need);
     if (q.have >= q.need) {
         q.state = READY;
-        say(msg, q.title + " complete!\nReturn to " + labelOf(q.turnIn) + ".");
+        say(msg, tr("{0} complete!", tr(q.title)) + "\n" + tr("Return to {0}.", labelOf(q.turnIn)));
     }
 }
 
@@ -49,15 +49,15 @@ system Use(Entity e, Hero h, Transform3D t, Msg& msg) {
                 spoke = true;
                 q.state = DONE;
                 emit(Reward { xp = q.xp });
-                say(msg, npc.label + ": " + q.done + "\n[" + q.title + " completed: +" + q.xp + " xp]");
+                say(msg, tr(npc.label) + ": " + tr(q.done) + "\n" + tr("[{0} completed: +{1} xp]", tr(q.title), q.xp));
             }
         for (Quest& q : query)
             if (!spoke && q.giver == npc.id && q.state == AVAILABLE) {
                 spoke = true;
                 q.state = q.goal == "talk" ? READY : ACTIVE;
-                say(msg, q.title + "\n" + q.text);
+                say(msg, tr(q.title) + "\n" + tr(q.text));
             }
-        if (!spoke) say(msg, npc.label + ": Light be with you, friend.");
+        if (!spoke) say(msg, tr(npc.label) + ": " + tr("Light be with you, friend."));
     }
     for (Entity p, Pickup& pick, Transform3D pt : query) {
         if (done || pick.gone > 0 || dist(pt.position, t.position) > 2.5) continue;
@@ -70,7 +70,7 @@ system Use(Entity e, Hero h, Transform3D t, Msg& msg) {
                 spawn("Sparkle", Transform3D { position = pt.position });
                 progress(q, msg, q.item);
             }
-        if (!used) say(msg, "You have no use for that yet.");
+        if (!used) say(msg, tr("You have no use for that yet."));
     }
 }
 

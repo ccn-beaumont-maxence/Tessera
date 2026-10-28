@@ -20,32 +20,63 @@
   .card h2 { margin: 0 0 6px; font-size: 1.3rem; }
   .card p { margin: 0; color: var(--muted); }
   .card .keys { margin-top: 10px; font-size: .85rem; color: var(--accent); }
+  .langs { float: right; margin-top: 12px; }
+  .langs a { color: var(--muted); margin-left: 12px; text-decoration: none; }
+  .langs a[aria-current] { color: var(--text); font-weight: 600; }
 </style>
 </head>
 <body>
 <main>
+  <nav class="langs"><a href="?lang=en" lang="en">English</a><a href="?lang=ja" lang="ja">日本語</a><a href="?lang=ko" lang="ko">한국어</a></nav>
   <h1>Tessera</h1>
-  <p class="lead">A web 2D/3D game engine made for AI coding agents: a game is a YAML scene plus gameplay
-    in Tess, a small C++-flavored language. Both demos run in the browser.
-    <a href="https://github.com/ccn-beaumont-maxence/Tessera">Source on GitHub</a></p>
+  <p class="lead"><span data-t="lead">A web 2D/3D game engine made for AI coding agents: a game is a YAML scene plus gameplay
+    in Tess, a small C++-flavored language. Both demos run in the browser.</span>
+    <a href="https://github.com/ccn-beaumont-maxence/Tessera" data-t="source">Source on GitHub</a></p>
   <div class="grid">
     <a class="card" href="./forest/">
       <img src="./forest.png" alt="A hooded wanderer with a lantern in a glowing night forest">
       <div>
         <h2>The Whispering Wood</h2>
-        <p>Walk a procedural night forest with a lantern and gather twelve wisps to wake the great tree.</p>
-        <p class="keys">WASD walk · Shift run · Space jump</p>
+        <p data-t="forest">Walk a procedural night forest with a lantern and gather twelve wisps to wake the great tree.</p>
+        <p class="keys" data-t="forestKeys">WASD walk · Shift run · Space jump</p>
       </div>
     </a>
     <a class="card" href="./dawnvale/">
       <img src="./dawnvale.png" alt="An adventurer fighting candle-wearing kobolds near a mine">
       <div>
         <h2>Dawnvale</h2>
-        <p>An MMO-style starting valley: six quests, wolves, kobolds and a boss, from level 1 to 6.</p>
-        <p class="keys">WASD move · Tab target · 1 Strike · F talk</p>
+        <p data-t="dawnvale">An MMO-style starting valley: six quests, wolves, kobolds and a boss, from level 1 to 6.</p>
+        <p class="keys" data-t="dawnvaleKeys">WASD move · Tab target · 1 Strike · F talk</p>
       </div>
     </a>
   </div>
 </main>
+<script>
+  // Same choice as the games (?lang=, else the browser language); demo links carry it along.
+  const T = {
+    ja: {
+      lead: 'AIコーディングエージェントのために作られた、Web向け2D/3Dゲームエンジン。ゲームはYAMLのシーンと、C++風の小さな言語Tessで書くゲームプレイでできています。どちらのデモもブラウザで動きます。',
+      source: 'GitHubでソースを見る',
+      forest: '手続き生成された夜の森をランタンを手に歩き、12個のウィスプを集めて大樹を目覚めさせよう。',
+      forestKeys: 'WASD 移動 · Shift ダッシュ · Space ジャンプ',
+      dawnvale: 'MMO風の始まりの谷。6つのクエスト、オオカミ、コボルド、そしてボス。レベル1から6まで。',
+      dawnvaleKeys: 'WASD 移動 · Tab ターゲット · 1 ストライク · F 会話',
+    },
+    ko: {
+      lead: 'AI 코딩 에이전트를 위해 만든 웹 2D/3D 게임 엔진. 게임은 YAML 씬과, C++ 스타일의 작은 언어 Tess로 쓴 게임플레이로 이루어집니다. 두 데모 모두 브라우저에서 실행됩니다.',
+      source: 'GitHub에서 소스 보기',
+      forest: '절차적으로 생성된 밤의 숲을 랜턴을 들고 걸으며, 위습 12개를 모아 거대한 나무를 깨우세요.',
+      forestKeys: 'WASD 이동 · Shift 달리기 · Space 점프',
+      dawnvale: 'MMO 스타일의 시작 마을 계곡: 퀘스트 6개, 늑대, 코볼트, 그리고 보스. 레벨 1에서 6까지.',
+      dawnvaleKeys: 'WASD 이동 · Tab 대상 지정 · 1 일격 · F 대화',
+    },
+  };
+  const asked = new URLSearchParams(location.search).get('lang');
+  const lang = asked ?? navigator.languages.map((l) => l.slice(0, 2)).find((l) => l in T) ?? 'en';
+  for (const el of document.querySelectorAll('[data-t]')) el.textContent = T[lang]?.[el.dataset.t] ?? el.textContent;
+  for (const a of document.querySelectorAll('.card')) a.search = `?lang=${lang}`;
+  document.querySelector(`.langs [lang="${lang}"]`)?.setAttribute('aria-current', 'true');
+  document.documentElement.lang = lang;
+</script>
 </body>
 </html>

@@ -6,6 +6,7 @@ input:
   jump: [Space, PadA]
   run: [ShiftLeft, PadRT]
 physics: { gravity: [0, -18] }
+strings: { ja: ./ja.yaml, ko: ./ko.yaml }
 resources:
   Forest: {}
   Quest: {}

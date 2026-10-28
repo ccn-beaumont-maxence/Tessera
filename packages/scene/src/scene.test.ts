@@ -1,4 +1,14 @@
-import { component, mut, Parent, resource, system, Transform2D, World } from '@tessera/core';
+import {
+  component,
+  mut,
+  Parent,
+  resource,
+  Strings,
+  system,
+  Transform2D,
+  tr,
+  World,
+} from '@tessera/core';
 import { dump, find } from '@tessera/headless';
 import { isDown, press } from '@tessera/input';
 import { RigidBody } from '@tessera/physics';
@@ -85,6 +95,21 @@ describe('scene', () => {
     expect(isDown(w, 'jump')).toBe(true);
     expect(order).toEqual(['Walk']);
     expect(w.get(hero, Transform2D)?.position.x).toBeCloseTo(2);
+  });
+
+  it('loads strings: tables for tr(), from files or inline', async () => {
+    const { w } = await load({
+      '/game/scene.yaml': `${SCENE}strings: { ja: ./ja.yaml, ko: { Hello: 안녕 } }\n`,
+      '/game/ja.yaml': '"Coins {0}": "コイン {0}"\n',
+    });
+    expect(w.resource(Strings).lang).toBe('');
+    w.resource(Strings).lang = 'ja';
+    expect(tr(w, 'Coins {0}', 3)).toBe('コイン 3');
+    w.resource(Strings).lang = 'ko';
+    expect(tr(w, 'Hello')).toBe('안녕');
+    await expect(
+      load({ '/game/scene.yaml': `${SCENE}strings: { ja: { a: [1] } }\n` }),
+    ).rejects.toThrow('/game/scene.yaml:20: strings ja: map each source text to its translation');
   });
 
   it('converts 3D rotations and passes through absolute URLs', async () => {

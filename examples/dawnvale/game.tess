@@ -10,6 +10,7 @@ component TargetFrame {}
 component Tracker {}
 component Message {}
 component Bar { string of; }   // which HUD gauge this sprite or text shows
+component Help {}
 
 system CameraFollow(Transform3D& t, Follow f, View& v) {
     for (Entity e, Hero h, Transform3D p : query) {
@@ -48,7 +49,7 @@ string bar(float k, int n) {
 }
 
 system ShowPlayer(PlayerFrame f, Text& text) {
-    for (Hero h : query) text.text = "Adventurer   level " + h.level;
+    for (Hero h : query) text.text = tr("Adventurer   level {0}", h.level);
 }
 
 system ShowTarget(TargetFrame f, Text& text) {
@@ -56,7 +57,7 @@ system ShowTarget(TargetFrame f, Text& text) {
     for (Hero h : query)
         if (h.target != none && alive(h.target)) {
             Mob m = get<Mob>(h.target);
-            text.text = m.label + "  " + m.level + (m.kind == "foreman" ? " Elite" : "");
+            text.text = tr(m.label) + "  " + m.level + (m.kind == "foreman" ? " " + tr("Elite") : "");
             text.color = m.angry ? color("#ff8a7a") : color("#ffe9a0");
         }
 }
@@ -82,14 +83,18 @@ system GaugeTexts(Bar b, Text& text) {
 system ShowQuests(Tracker tr, Text& text) {
     string s = "";
     for (Quest q : query) {
-        if (q.state == ACTIVE) s = s + q.title + "\n  " + q.item + " " + q.have + "/" + q.need + "\n";
-        if (q.state == READY) s = s + q.title + "\n  Complete: see " + labelOf(q.turnIn) + "\n";
+        if (q.state == ACTIVE) s = s + tr(q.title) + "\n  " + tr(q.item) + " " + q.have + "/" + q.need + "\n";
+        if (q.state == READY) s = s + tr(q.title) + "\n  " + tr("Complete: see {0}", labelOf(q.turnIn)) + "\n";
     }
     text.text = s;
 }
 
 system ShowMessage(Message mm, Text& text, Msg& msg) {
     msg.time = max(msg.time - dt, 0);
-    text.text = msg.text;
+    text.text = tr(msg.text);   // messages are translated when said; this catches the YAML welcome
     text.color.a = min(1, msg.time);
+}
+
+system ShowHelp(Help h, Text& text) {
+    text.text = tr("WASD move  Q/E strafe  Space jump  Tab or click: target  1 Strike  F talk/gather");
 }
