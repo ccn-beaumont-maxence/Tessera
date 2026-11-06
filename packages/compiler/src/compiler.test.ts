@@ -14,6 +14,7 @@ import {
 } from '@tessera/core';
 import { addPhysics, Collider } from '@tessera/physics';
 import { afterAll, describe, expect, it } from 'vitest';
+import { ENGINE } from './engine';
 import { compile } from './index';
 
 const err = (src: string) => {
@@ -49,6 +50,16 @@ describe('C++ reflexes', () => {
     ['void f() { float x = (float)1; }', 'use a function-style cast: float(x)'],
     ['void f() { int a = b[0]; }', 'Tess has no arrays'],
     ['template <T> void f() {}', 'Tess has no templates'],
+    ['void f(int x) { switch (x) {} }', 'game.tess:1:17: Tess has no switch: use if / else if'],
+    ['void f() { do {} while (true); }', 'Tess has no do-while'],
+    ['enum State { A };', 'Tess has no enum: use constants'],
+    ['void f() { int x = 0xFF; }', 'game.tess:1:20: Tess has no hex numbers: write 255'],
+    ['void f() { int x = 3 & 1; }', 'Tess has no bitwise operators'],
+    ['void f() { int x = 1 << 2; }', 'Tess has no bitwise operators'],
+    ['int f() { retrun 1; }', 'game.tess:1:11: unknown statement "retrun" (did you mean return?)'],
+    ['sytem S(Transform2D t) {}', 'unknown type "sytem" (did you mean system?)'],
+    ['void f() { const float K = 2; K = 3; }', 'cannot write "K": constants are read-only'],
+    ['void f(float x) { log(x.toString()); }', 'Tess has no toString: concatenate, "" + x'],
   ])('%s', (src, msg) => {
     expect(err(src)).toContain(msg);
   });
@@ -113,6 +124,22 @@ describe('type errors', () => {
     ],
     ['void f() { float x = 1 } ', 'expected ";"'],
     ['component C { float v = dt; }', 'dt is not available in defaults'],
+    [
+      'system S(RigidBody& b) { b.velocity = axis("move"); }',
+      'expected vec3, got vec2: write vec3(v.x, v.y, 0)',
+    ],
+    ['void f() { float constructor = 1; float valueOf = constructor; }', 'compiled'],
+    [
+      'system S(Player p) {}',
+      'game.tess:1:10: unknown type "Player": declare it, or add `using "./file.tess";`',
+    ],
+    [
+      'component H { float v; }\nsystem S(H h) { for (Player p : query) {} }',
+      'game.tess:2:22: unknown type "Player": declare it',
+    ],
+    ['void f(Entity e) { has<Player>(e); }', 'unknown type "Player": declare it'],
+    ['system S() { for (Hit h : events<Hit>()) {} }', 'unknown type "Hit": declare it'],
+    ['system S() { emit(Hit { v = 1 }); }', 'unknown type "Hit": declare it'],
   ])('%s', (src, msg) => {
     expect(err(src)).toContain(msg);
   });
@@ -328,6 +355,76 @@ system Look(Probe& p) {
     expect(p).toMatchObject({ point: { x: 0, y: 0.5 }, normal: { x: 0, y: 1 }, hit: ground });
     expect(p.distance).toBeCloseTo(4.5);
     expect(p.near).toBe(9);
+  });
+
+  it('prints vectors in strings and rejects whole components', async () => {
+    const m = await load(`
+resource Out { string s; }
+system S(Out& o) {
+    o.s = "p " + vec2(1, 2);
+    o.s += vec3(0.5, 0, -1);
+}
+`);
+    const w = new World();
+    w.addSystem(sys(m, 'S'));
+    w.step();
+    expect(w.resourceList()[0]?.[1]).toEqual({ s: 'p (1, 2)(0.5, 0, -1)' });
+    expect(err('component H { float v; }\nsystem S(H h) { string s = "v " + h; }')).toContain(
+      'game.tess:2:35: cannot add H to a string: add one of its fields, e.g. h.v',
+    );
+  });
+
+  it('types ternaries and clamp by both sides and truncates floats stored in ints', async () => {
+    const m = await load(`
+component C { int v = 2.5; }
+resource Out { float r; float c; int n; int h; Entity e; }
+int half(int x) { return x / 2.0; }
+void setN(Out& o, int v) { o.n = v; }
+system S(Out& o) {
+    bool b = true;
+    o.r = (b ? 1 : 0.5) / 2;
+    o.c = clamp(3, 0, 2.5) / 2;
+    setN(o, 2.5);
+    o.h = half(3);
+    o.e = o.e == none ? none : o.e;
+}
+`);
+    const w = new World();
+    w.addSystem(sys(m, 'S'));
+    w.step();
+    expect(w.resourceList()[0]?.[1]).toEqual({ r: 0.5, c: 1.25, n: 2, h: 1, e: 0 });
+    expect(comp(m, 'C').create()).toEqual({ v: 2 });
+  });
+
+  it('writes a field of a vector reached through get<T>(e)', async () => {
+    const m = await load(`
+system S(Entity e, Transform2D t) {
+    get<Transform2D>(e).position.x = 3;
+    get<Transform2D>(e).position.y += 2;
+}
+`);
+    const w = new World();
+    const e = w.spawn();
+    w.add(e, Transform2D);
+    w.addSystem(sys(m, 'S'));
+    w.step();
+    expect(w.get(e, Transform2D)?.position).toEqual({ x: 3, y: 2 });
+  });
+
+  it('types every field of the engine components', async () => {
+    // Arrays have no Tess type.
+    const untyped = ['Tilemap.tiles', 'SpriteAnimation.frames'];
+    for (const [name, info] of Object.entries(ENGINE)) {
+      if (info.kind !== 'component' && info.kind !== 'resource') continue;
+      const mod = (await import(/* @vite-ignore */ info.module as string)) as Record<
+        string,
+        ComponentType<object>
+      >;
+      const keys = Object.keys(mod[name]?.create() ?? {});
+      expect([...info.fields.keys()].sort(), name).toEqual(
+        keys.filter((k) => !untyped.includes(`${name}.${k}`)).sort(),
+      );
+    }
   });
 
   it('emits events, spawns nothing without a scene, and reports runtime errors at the .tess line', async () => {

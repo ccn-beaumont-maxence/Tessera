@@ -52,6 +52,26 @@ const PAD_BUTTONS = [
   'PadRight',
 ];
 const MOUSE = ['MouseLeft', 'MouseMiddle', 'MouseRight'];
+
+/** Button names bindings accept: KeyboardEvent.code values (UI Events spec) plus Mouse and Pad. */
+export const BUTTONS: readonly string[] = [
+  ...[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((c) => `Key${c}`),
+  ...[...'0123456789'].map((d) => `Digit${d}`),
+  ...Array.from({ length: 24 }, (_, i) => `F${i + 1}`),
+  ...['Up', 'Down', 'Left', 'Right'].map((d) => `Arrow${d}`),
+  ...['Shift', 'Control', 'Alt', 'Meta'].flatMap((m) => [`${m}Left`, `${m}Right`]),
+  ...[1, 2, 3, 4, 5].map((n) => `Lang${n}`),
+  ...`Space Enter Escape Tab Backspace CapsLock ContextMenu Delete Insert Home End PageUp PageDown
+  Help Minus Equal BracketLeft BracketRight Semicolon Quote Backquote Backslash Comma Period Slash
+  IntlBackslash IntlRo IntlYen Convert NonConvert KanaMode NumLock ScrollLock Pause PrintScreen
+  Fn FnLock`.split(/\s+/),
+  ...MOUSE,
+  ...PAD_BUTTONS.filter((b) => b),
+];
+
+/** True for a name in BUTTONS or a numpad code (Numpad0, NumpadEnter...). */
+export const isButton = (name: string): boolean =>
+  BUTTONS.includes(name) || /^Numpad\w+$/.test(name);
 const DEADZONE = 0.2;
 
 /** Declares actions and schedules the `Input` system (add it before gameplay systems). */
@@ -137,7 +157,10 @@ export const pointer = (world: World): Readonly<Vec2> => world.resource(InputSta
 /** Viewport width / height. */
 export const aspect = (world: World): number => world.resource(InputState).aspect;
 
-/** Holds a raw button, or the first button bound to an action (headless tests, replays). */
+/**
+ * Holds a raw button, the first button bound to an action, or one direction of an axis action
+ * (`move.left`) (headless tests, replays).
+ */
 export function press(world: World, buttonOrAction: string): void {
   world.resource(InputState).buttons.add(firstButton(world, buttonOrAction));
 }
@@ -147,9 +170,29 @@ export function release(world: World, buttonOrAction: string): void {
 }
 
 function firstButton(world: World, name: string): string {
-  const b = world.resource(InputState).bindings[name];
-  if (!b) return name;
-  const first = Array.isArray(b) ? b[0] : (b.right ?? b.up ?? b.left ?? b.down)?.[0];
+  const bindings = world.resource(InputState).bindings;
+  // Action names may contain dots (`ui.confirm`): the full name first, then `action.direction`.
+  const dot = name.lastIndexOf('.');
+  const dir = bindings[name] || dot < 0 ? undefined : name.slice(dot + 1);
+  const actionName = dir === undefined ? name : name.slice(0, dot);
+  const b = bindings[actionName];
+  if (!b) {
+    if (isButton(name)) return name;
+    const known = Object.keys(bindings).join(', ') || 'none; call addInput first';
+    throw new Error(`input: unknown action or key "${name}" (actions: ${known})`);
+  }
+  if (dir !== undefined && Array.isArray(b))
+    throw new Error(
+      `input: "${actionName}" is a button action, it has no directions (use ${actionName})`,
+    );
+  if (dir !== undefined && !['left', 'right', 'up', 'down'].includes(dir))
+    throw new Error(`input: unknown direction "${dir}" (use ${actionName}.left/right/up/down)`);
+  const list = Array.isArray(b)
+    ? b
+    : dir
+      ? b[dir as 'left']
+      : (b.right ?? b.up ?? b.left ?? b.down);
+  const first = list?.[0];
   if (!first) throw new Error(`input: action "${name}" has no button to press`);
   return first;
 }

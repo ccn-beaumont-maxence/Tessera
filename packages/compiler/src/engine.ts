@@ -16,7 +16,11 @@ const s = (
   fields: new Map(Object.entries(fields)),
 });
 
-export const ENGINE: Record<string, StructInfo> = {
+/** A lookup table without Object.prototype keys, so `toString` is not a type or a C++ habit. */
+export const table = <T>(o: Record<string, T>): Record<string, T> =>
+  Object.assign(Object.create(null) as Record<string, T>, o);
+
+export const ENGINE: Record<string, StructInfo> = table({
   Transform2D: s('component', '@tessera/core', {
     position: 'vec2',
     rotation: 'float',
@@ -137,7 +141,7 @@ export const ENGINE: Record<string, StructInfo> = {
     time: 'float',
   }),
   Light: s('component', '@tessera/render', { kind: 'string', color: 'color', intensity: 'float' }),
-  Camera2D: s('component', '@tessera/render', { height: 'float' }),
+  Camera2D: s('component', '@tessera/render', { height: 'float', width: 'float' }),
   Camera3D: s('component', '@tessera/render', {
     fov: 'float',
     near: 'float',
@@ -159,19 +163,19 @@ export const ENGINE: Record<string, StructInfo> = {
     distance: 'float',
   }),
   Ray: s('struct', '@tessera/render', { origin: 'vec3', dir: 'vec3' }),
-};
+});
 
 /** Component names of the value types, in storage order. */
-export const VALUE: Record<string, string[]> = {
+export const VALUE: Record<string, string[]> = table({
   vec2: ['x', 'y'],
   vec3: ['x', 'y', 'z'],
   quat: ['x', 'y', 'z', 'w'],
   color: ['r', 'g', 'b', 'a'],
-};
+});
 
 export const SCALARS = ['float', 'int', 'bool', 'string', 'Entity'];
 
-export const TS_TYPE: Record<string, string> = {
+export const TS_TYPE: Record<string, string> = table({
   float: 'number',
   int: 'number',
   bool: 'boolean',
@@ -182,4 +186,4 @@ export const TS_TYPE: Record<string, string> = {
   vec3: 'Vec3',
   quat: 'Quat',
   color: 'Color',
-};
+});

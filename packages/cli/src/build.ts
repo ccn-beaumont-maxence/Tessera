@@ -8,16 +8,24 @@ import { build } from 'vite';
 const ASSET = /[\w./-]+\.(png|jpe?g|webp|gif|svg|gltf|glb|mp3|ogg|wav|m4a)\b/gi;
 
 /** Module that starts a YAML scene with its files, scripts and assets bundled in. */
-async function sceneMain(path: string, render: string, scene: string): Promise<string> {
+export async function sceneMain(path: string, render: string, scene: string): Promise<string> {
   const files: Record<string, string> = {};
-  const parsed = await parseScene(path, {
-    read: async (p) => {
+  const io = {
+    read: async (p: string) => {
       files[p] = readFileSync(p, 'utf8');
       return files[p];
     },
     load: async () => ({}),
-    url: (p) => p,
-  });
+    url: (p: string) => p,
+  };
+  // The scenes loadScene() may switch to, with their own files and scripts.
+  const scripts = new Set<string>();
+  const todo = [path];
+  for (let p = todo.shift(); p; p = todo.shift()) {
+    const parsed = await parseScene(p, io);
+    for (const s of parsed.scripts) scripts.add(s);
+    todo.push(...parsed.scenes.filter((s) => files[s] === undefined && !todo.includes(s)));
+  }
   const assets = new Set<string>();
   for (const [file, text] of Object.entries(files)) {
     for (const m of text.matchAll(ASSET)) {
@@ -29,13 +37,13 @@ async function sceneMain(path: string, render: string, scene: string): Promise<s
     `import { start } from ${JSON.stringify(render)};`,
     `import { sceneGame } from ${JSON.stringify(scene)};`,
   ];
-  for (const [i, s] of parsed.scripts.entries())
+  for (const [i, s] of [...scripts].entries())
     lines.push(`import * as s${i} from ${JSON.stringify(s)};`);
   for (const [i, a] of [...assets].entries())
     lines.push(`import a${i} from ${JSON.stringify(`${a}?url`)};`);
   lines.push(
     `const files = ${JSON.stringify(files)};`,
-    `const scripts = { ${parsed.scripts.map((s, i) => `${JSON.stringify(s)}: s${i}`).join(', ')} };`,
+    `const scripts = { ${[...scripts].map((s, i) => `${JSON.stringify(s)}: s${i}`).join(', ')} };`,
     `const assets = { ${[...assets].map((a, i) => `${JSON.stringify(a)}: a${i}`).join(', ')} };`,
     'const io = { read: async (p) => files[p], load: async (p) => scripts[p], url: (p) => assets[p] ?? p };',
     `const game = await sceneGame(${JSON.stringify(path)}, io);`,

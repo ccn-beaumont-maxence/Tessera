@@ -50,5 +50,35 @@ describe('input', () => {
     const v = new World();
     addInput(v, { empty: [] });
     expect(() => press(v, 'empty')).toThrow('has no button');
+    expect(() => press(w, 'jmp')).toThrow('unknown action or key "jmp" (actions: jump, move)');
+    expect(() => press(w, 'jump.left')).toThrow(
+      '"jump" is a button action, it has no directions (use jump)',
+    );
+    expect(() => press(w, 'move.lft')).toThrow(
+      'unknown direction "lft" (use move.left/right/up/down)',
+    );
+  });
+
+  it('presses dotted action names and any KeyboardEvent.code', () => {
+    const w = new World();
+    addInput(w, { 'ui.confirm': ['Enter'], 'ui.move': { left: ['KeyA'] } });
+    press(w, 'ui.confirm');
+    press(w, 'ui.move.left');
+    press(w, 'IntlBackslash');
+    w.step();
+    expect(isDown(w, 'ui.confirm')).toBe(true);
+    expect(axis(w, 'ui.move').x).toBe(-1);
+  });
+
+  it('presses one direction of an axis action', () => {
+    const w = setup();
+    press(w, 'move.left');
+    press(w, 'move.down');
+    w.step();
+    expect(axis(w, 'move').x).toBeCloseTo(-Math.SQRT1_2);
+    expect(axis(w, 'move').y).toBeCloseTo(-Math.SQRT1_2);
+    release(w, 'move.down');
+    w.step();
+    expect(axis(w, 'move')).toEqual({ x: -1, y: 0 });
   });
 });

@@ -24,7 +24,7 @@ export type Decl =
   | ({ kind: 'function'; name: string; ret: TypeRef; params: Param[]; body: Stmt[] } & Pos);
 
 export type Stmt =
-  | ({ kind: 'var'; type: TypeRef | null; name: string; init: Expr | null } & Pos)
+  | ({ kind: 'var'; type: TypeRef | null; name: string; init: Expr | null; const: boolean } & Pos)
   | ({ kind: 'expr'; expr: Expr } & Pos)
   | ({ kind: 'if'; cond: Expr; then: Stmt[]; else: Stmt[] | null } & Pos)
   | ({ kind: 'while'; cond: Expr; body: Stmt[] } & Pos)

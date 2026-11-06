@@ -31,9 +31,9 @@ is an error. Two files cannot use each other: move what they share to a third fi
 
 ## Types
 
-`float`, `int` (integer division truncates), `bool`, `string`, `Entity` (`none` = no entity),
+`float`, `int` (integer division truncates, as does a float stored in an int), `bool`, `string`, `Entity` (`none` = no entity),
 value types `vec2`, `vec3`, `quat`, `color`, and declared component/resource/event names.
-`auto` infers a local's type. Value types are copied on assignment, never allocated.
+`auto` infers a local's type; `const float K = 2;` also declares a read-only local. Value types are copied on assignment, never allocated.
 
 ## Systems
 
@@ -64,7 +64,7 @@ void respawn(Entity e, Score& score) { get<Transform2D>(e).position = vec2(0, 1)
 Parameters are read-only; component and resource parameters may be `T&` (passed by reference).
 
 `if/else`, `while`, `for (init; cond; step)`, `break`, `continue`, `return`, `? :`,
-`+ - * / %` (`+` with a string concatenates: `"Coins " + n`), `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
+`+ - * / %` (`+` with a string concatenates: `"Coins " + n`; vectors print as `(x, y)`), `== != < <= > >=`, `&& || !`, `= += -= *= /=`, `++ --`. Comments `//` and `/* */`.
 
 Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (combine),
 `q * v` (rotate); on a `color` these keep alpha (`c * 0.8` darkens). Fields `.x .y .z .w`, `.r .g .b .a`.
@@ -92,9 +92,9 @@ Value-type math: `v + w`, `v - w`, `v * s`, `s * v`, `v / s`, `-v`, `q * q` (com
 | Debug | `log(a, b, ...)` |
 
 Engine components usable in parameters and `get<T>`: `Transform2D {position, rotation, scale}`,
-`Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `Timer {duration, time, repeat, destroy, done}`, `RigidBody {type, velocity, angularVelocity,
-gravityScale, linearDamping, lockRotation}`, `Collider {shape, size, sensor, friction,
-restitution, density}`, `Sprite` (`screen: true` + `align: "left"` + scale.x = HUD bar), `SpriteAnimation`, `Text {text, size, color, align, layer, screen, billboard}`, `Tilemap`, `Terrain`, `Particles` (set `burst` to emit), `Mesh`, `Animator {clip, speed, loop, time}` (glTF clip of Mesh.model), `Light`, `Camera2D`, `Camera3D`.
+`Transform3D {position, rotation, scale}`, `Parent {entity}` (transform relative to it), `Timer {duration, time, repeat, destroy, done}`, `RigidBody {type, vec3 velocity, vec3 angularVelocity,
+gravityScale, linearDamping, lockRotation}` (vec3 in 2D too: `vec3(v.x, v.y, 0)`), `Collider {shape, vec3 size, sensor, friction,
+restitution, density}`, `Sprite` (`screen: true` + `align: "left"` + scale.x = HUD bar), `SpriteAnimation`, `Text {text, size, color, align, layer, screen, billboard}`, `Tilemap`, `Terrain`, `Particles` (set `burst` to emit), `Mesh`, `Animator {clip, speed, loop, time}` (glTF clip of Mesh.model), `Light`, `Camera2D {height, width}`, `Camera3D`.
 Engine event: `Collision {Entity a; Entity b; bool started; bool sensor;}`.
 
 Conventions: Y up, meters, radians, 3D forward is -Z.
@@ -109,6 +109,7 @@ Conventions: Y up, meters, radians, 3D forward is -Z.
 | `new`, `delete`, `nullptr` | `spawn`, `destroy`, `none` |
 | `class`, `struct` | `component`, `resource`, `event` |
 | `::` | `.` |
+| `switch`, `do ... while`, `enum` | `if / else if`, `while`, `const int IDLE = 0;` |
 
 ## Errors
 

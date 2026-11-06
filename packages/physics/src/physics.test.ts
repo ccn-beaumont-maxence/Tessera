@@ -1,4 +1,5 @@
 import {
+  Parent,
   Terrain,
   Tilemap,
   Transform2D,
@@ -140,6 +141,112 @@ describe.each<Dim>(['2d', '3d'])('physics %s', (dim) => {
     const t = w.get(k, Transform2D) ?? w.get(k, Transform3D);
     expect(t?.position.x).toBeCloseTo(-4, 1);
   });
+
+  it('updates the collider when its fields change, without re-firing contacts', async () => {
+    const w = await scene(dim);
+    const box = find(w, 'Box');
+    runFrames(w, 120);
+    const c = w.get(box, Collider);
+    if (!c) throw new Error('no collider');
+    const events: boolean[] = [];
+    w.addSystem({
+      name: 'Watch',
+      reads: [],
+      writes: [],
+      run: (world) => {
+        for (const e of world.events(Collision)) if (!e.sensor) events.push(e.started);
+      },
+    });
+    c.size.x = c.size.y = c.size.z = 4;
+    runFrames(w, 60);
+    expect(y(w, 'Box')).toBeCloseTo(2, 1);
+    for (let i = 0; i < 10; i++) {
+      c.size.x += 0.01;
+      runFrames(w, 1);
+    }
+    expect(events).toEqual([]);
+    c.sensor = true;
+    runFrames(w, 60);
+    expect(y(w, 'Box')).toBeLessThan(0);
+  });
+
+  it('applies game-side angular velocity to dynamic and kinematic bodies', async () => {
+    const w = await scene(dim);
+    const box = find(w, 'Box');
+    w.add(box, RigidBody, { gravityScale: 0 });
+    const k = w.spawn('Spinner');
+    w.add(k, TF(dim), { position: vec3(-8, 3, 0) } as never);
+    w.add(k, RigidBody, { type: 'kinematic', angularVelocity: vec3(0, 0, 1) });
+    runFrames(w, 1);
+    const rb = w.get(box, RigidBody);
+    if (!rb) throw new Error('no body');
+    rb.angularVelocity.z = 2;
+    runFrames(w, 30);
+    expect(rb.angularVelocity.z).toBeCloseTo(2);
+    const spin = (e: number) => {
+      const r = w.get(e, Transform2D)?.rotation ?? w.get(e, Transform3D)?.rotation.z ?? NaN;
+      return dim === '2d' ? r : 2 * Math.asin(r as number);
+    };
+    expect(spin(box)).toBeCloseTo(1, 1);
+    expect(spin(k)).toBeCloseTo(31 / 60, 2);
+    rb.lockRotation = true;
+    rb.angularVelocity.z = 4;
+    const locked = spin(box);
+    runFrames(w, 30);
+    expect(spin(box)).toBeCloseTo(locked, 3);
+  });
+
+  it('carries riders on a kinematic body moved by its Transform', async () => {
+    const w = new World();
+    await addPhysics(w, { dimension: dim });
+    const k = w.spawn('Platform');
+    const pt = w.add(k, TF(dim), { position: vec3(0, 0, 0) } as never);
+    w.add(k, RigidBody, { type: 'kinematic' });
+    w.add(k, Collider, { size: vec3(6, 0.5, 6) });
+    const box = w.spawn('Box');
+    w.add(box, TF(dim), { position: vec3(0, 0.75, 0) } as never);
+    w.add(box, RigidBody, { lockRotation: true });
+    w.add(box, Collider);
+    runFrames(w, 30);
+    const move = () => {
+      pt.position.x += 2 / 60;
+    };
+    w.addSystem({ name: 'Move', reads: [], writes: [], run: move });
+    runFrames(w, 60);
+    expect(pt.position.x).toBeCloseTo(2, 1);
+    const bx = w.get(box, Transform2D)?.position.x ?? w.get(box, Transform3D)?.position.x;
+    expect(bx).toBeGreaterThan(1);
+  });
+
+  it("reports 'ended' when a touching entity is destroyed", async () => {
+    const w = await scene(dim);
+    const ball = w.spawn('Ball');
+    w.add(ball, TF(dim), { position: vec3(5, 1, 0) } as never);
+    w.add(ball, RigidBody, { gravityScale: 0 });
+    w.add(ball, Collider, { shape: 'sphere', size: vec3(0.5, 0.5, 0.5) });
+    const ended: number[] = [];
+    w.addSystem({
+      name: 'Watch',
+      reads: [],
+      writes: [],
+      run: (world) => {
+        for (const c of world.events(Collision)) if (c.sensor && !c.started) ended.push(c.a, c.b);
+      },
+    });
+    runFrames(w, 2);
+    w.destroy(ball);
+    runFrames(w, 2);
+    expect(ended).toContain(ball);
+    // The destroyed entity is the sensor itself: its flag comes from the removed collider.
+    const ball2 = w.spawn('Ball2');
+    w.add(ball2, TF(dim), { position: vec3(5, 1, 0) } as never);
+    w.add(ball2, RigidBody, { gravityScale: 0 });
+    w.add(ball2, Collider, { shape: 'sphere', size: vec3(0.5, 0.5, 0.5) });
+    runFrames(w, 2);
+    w.destroy(find(w, 'Zone'));
+    runFrames(w, 2);
+    expect(ended).toContain(ball2);
+  });
 });
 
 describe('physics errors', () => {
@@ -160,6 +267,12 @@ describe('physics errors', () => {
     w.add(g, Transform3D);
     w.add(g, Collider, { shape: 'cone' as never });
     expect(() => runFrames(w, 1)).toThrow('unknown shape "cone"');
+    w.destroy(g);
+    const h = w.spawn('Hitbox');
+    w.add(h, Transform3D);
+    w.add(h, Parent, { entity: w.spawn('Owner') });
+    w.add(h, Collider);
+    expect(() => runFrames(w, 1)).toThrow('#4 Hitbox has a Parent');
   });
 });
 

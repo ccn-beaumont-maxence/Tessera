@@ -48,9 +48,10 @@ export class Physics2D extends Backend<R.RigidBody, R.Collider> {
     const rb = w.get(e, RigidBody);
     const desc = BODY[type]().setTranslation(t.position.x, t.position.y).setRotation(t.rotation);
     if (rb) {
-      desc.setLinvel(rb.velocity.x, rb.velocity.y).setAngvel(rb.angularVelocity.z);
+      desc.setLinvel(rb.velocity.x, rb.velocity.y);
       desc.setGravityScale(rb.gravityScale).setLinearDamping(rb.linearDamping);
       if (rb.lockRotation) desc.lockRotations();
+      else desc.setAngvel(rb.angularVelocity.z);
     }
     return this.rw.createRigidBody(desc);
   }
@@ -84,6 +85,13 @@ export class Physics2D extends Backend<R.RigidBody, R.Collider> {
     throw new Error('Terrain is 3D only: use a Tilemap for 2D ground');
   }
 
+  protected updateCollider(col: R.Collider, c: ColliderData): void {
+    col.setSensor(c.sensor);
+    col.setFriction(c.friction);
+    col.setRestitution(c.restitution);
+    col.setDensity(c.density);
+  }
+
   protected removeBody(body: R.RigidBody): void {
     this.rw.removeRigidBody(body);
   }
@@ -96,15 +104,29 @@ export class Physics2D extends Backend<R.RigidBody, R.Collider> {
     const t = pose(w, e);
     const p = t.position;
     const l = rec.last;
-    if (p.x !== l.x || p.y !== l.y) rec.body.setTranslation(p, true);
-    if (t.rotation !== l.a) rec.body.setRotation(t.rotation, true);
     const rb = w.get(e, RigidBody);
+    if (rb && rec.type === 'kinematic') {
+      // Move (not teleport) to Transform + velocity * dt: Rapier derives the speed that carries riders.
+      const v = rb.velocity;
+      rec.body.setNextKinematicTranslation({ x: p.x + v.x * w.dt, y: p.y + v.y * w.dt });
+      rec.body.setNextKinematicRotation(t.rotation + rb.angularVelocity.z * w.dt);
+    } else {
+      if (p.x !== l.x || p.y !== l.y) rec.body.setTranslation(p, true);
+      if (t.rotation !== l.a) rec.body.setRotation(t.rotation, true);
+    }
     if (!rb) return;
     const v = rb.velocity;
-    if (rec.type === 'kinematic') {
-      rec.body.setNextKinematicTranslation({ x: p.x + v.x * w.dt, y: p.y + v.y * w.dt });
-    } else if (v.x !== rec.v.x || v.y !== rec.v.y) {
+    if (rec.type !== 'kinematic' && (v.x !== rec.v.x || v.y !== rec.v.y)) {
       rec.body.setLinvel(v, true);
+    }
+    const relock = rb.lockRotation !== rec.lock;
+    if (relock) {
+      rec.lock = rb.lockRotation;
+      rec.body.lockRotations(rec.lock, true);
+    }
+    // A locked body does not spin, whatever angularVelocity says (same as locked at creation).
+    if (rec.type !== 'kinematic' && (relock || rb.angularVelocity.z !== rec.av.z)) {
+      rec.body.setAngvel(rec.lock ? 0 : rb.angularVelocity.z, true);
     }
     rec.body.setGravityScale(rb.gravityScale, false);
     rec.body.setLinearDamping(rb.linearDamping);
@@ -123,11 +145,12 @@ export class Physics2D extends Backend<R.RigidBody, R.Collider> {
     t.position.y = rec.last.y = p.y;
     t.rotation = rec.last.a = rec.body.rotation();
     const rb = w.get(e, RigidBody);
-    if (!rb) return;
+    // Kinematic velocities are game input: reading back the derived ones would compound them.
+    if (!rb || rec.type === 'kinematic') return;
     const v = rec.body.linvel();
     rb.velocity.x = rec.v.x = v.x;
     rb.velocity.y = rec.v.y = v.y;
-    rb.angularVelocity.z = rec.body.angvel();
+    rb.angularVelocity.z = rec.av.z = rec.body.angvel();
   }
 
   protected isSensor(handle: number): boolean {

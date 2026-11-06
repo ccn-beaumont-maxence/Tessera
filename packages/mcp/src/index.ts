@@ -11,10 +11,10 @@ Start with \`state\` (one line per entity: #id Name Component{non-default fields
 \`logs\` returns console output and runtime errors (the game pauses itself on an error).
 \`screenshot\` shows the current frame. \`reload\` restarts the game.`;
 
-/** Page-side helpers, loaded as a module next to the game so they share its engine modules. */
-const PAGE_OPS = (headless: string, input: string) => `
+/** Page-side helpers, loaded as a module next to the game. Input goes through `window.tess`:
+ * a separate import could load a second `@tessera/input` instance whose resource the game never reads. */
+const PAGE_OPS = (headless: string) => `
 import * as h from '/@fs${headless}';
-import * as input from '/@fs${input}';
 const run = () => window.tess;
 const world = () => run().world;
 const fail = (m) => { throw new Error(m); };
@@ -53,7 +53,7 @@ window.__mcp = {
   },
   step: (a) => { run().paused = true; run().step(a.frames); return state(a.filter); },
   run: (a) => { run().paused = a.paused; return 'paused: ' + a.paused; },
-  input: (a) => { (a.down ? input.press : input.release)(world(), a.name); return (a.down ? 'holding ' : 'released ') + a.name; },
+  input: (a) => { run()[a.down ? 'press' : 'release'](a.name); return (a.down ? 'holding ' : 'released ') + a.name; },
 };
 window.__mcpReady = true;
 `;
@@ -76,7 +76,7 @@ export async function createTessServer(
   const browser = await launch(!options.headed);
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const require = createRequire(import.meta.url);
-  const ops = PAGE_OPS(require.resolve('@tessera/headless'), require.resolve('@tessera/input'));
+  const ops = PAGE_OPS(require.resolve('@tessera/headless'));
   let logs: string[] = [];
   page.on('console', (m) => {
     if (m.type() !== 'debug' && !m.text().startsWith('[vite]'))
@@ -174,7 +174,7 @@ export async function createTessServer(
     'input',
     {
       description:
-        'Hold (down=true) or release an input action (e.g. jump) or key code (e.g. ArrowLeft).',
+        'Hold (down=true) or release an input action (jump), one direction of an axis action (move.left) or a key code (ArrowLeft).',
       inputSchema: { name: z.string(), down: z.boolean() },
     },
     async (a) => text(await op('input', a)),

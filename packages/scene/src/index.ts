@@ -1,8 +1,8 @@
 import type { World } from '@tessera/core';
 import { parseScene, type SceneIO } from './parse';
-import { currentScene, reload } from './scene';
+import { reload, scenePaths } from './scene';
 
-export { mergeSpec, type Parsed, parseScene, type SceneIO, type Spec } from './parse';
+export { ASSET, mergeSpec, type Parsed, parseScene, type SceneIO, type Spec } from './parse';
 export { build, currentScene, loadScene, reload, sceneGame, spawnPrefab } from './scene';
 
 /** Browser IO through the Vite dev server (`/@fs` serves absolute paths). */
@@ -18,15 +18,21 @@ export const browserIO: SceneIO = {
 
 type Hot = { on(event: string, cb: (data: { file: string }) => void): void };
 
-/** Re-applies the scene when one of its YAML files changes (`tess dev` sends `tess:yaml`). */
+/**
+ * Re-applies scenes when one of their YAML files changes (`tess dev` sends `tess:yaml`): the
+ * running scene, and the others listed under `scenes:` for the next loadScene().
+ */
 export function watch(world: World, path: string, io: SceneIO = browserIO): void {
   const hot = (import.meta as ImportMeta & { hot?: Hot }).hot;
   hot?.on('tess:yaml', async ({ file }) => {
     try {
-      const next = await parseScene(currentScene(world) ?? path, io);
-      if (!next.files.includes(file)) return;
-      if (!reload(world, next)) location.reload();
-      else console.info(`tess: applied ${file}`);
+      const paths = scenePaths(world);
+      for (const p of paths.length > 0 ? paths : [path]) {
+        const next = await parseScene(p, io);
+        if (!next.files.includes(file)) continue;
+        if (!reload(world, next)) return location.reload();
+        console.info(`tess: applied ${file}`);
+      }
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
     }

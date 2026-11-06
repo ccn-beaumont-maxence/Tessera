@@ -1,5 +1,5 @@
 import * as R from '@dimforge/rapier3d-compat';
-import { type Entity, Transform3D, type Vec3, type World } from '@tessera/core';
+import { type Entity, quat, Transform3D, type Vec3, vec3, type World } from '@tessera/core';
 import {
   Backend,
   type ColliderData,
@@ -33,6 +33,9 @@ const shapeDesc = (shape: Shape, size: Point) => {
 
 const pose = (w: World, e: Entity) =>
   w.get(e, Transform3D) ?? missingTransform(e, w, 'Transform3D');
+const axis = vec3();
+const spin = quat();
+const still = vec3();
 
 export class Physics3D extends Backend<R.RigidBody, R.Collider> {
   private readonly rw: R.World;
@@ -50,9 +53,9 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
     desc.setRotation(t.rotation);
     if (rb) {
       desc.setLinvel(rb.velocity.x, rb.velocity.y, rb.velocity.z);
-      desc.setAngvel(rb.angularVelocity);
       desc.setGravityScale(rb.gravityScale).setLinearDamping(rb.linearDamping);
       if (rb.lockRotation) desc.lockRotations();
+      else desc.setAngvel(rb.angularVelocity);
     }
     return this.rw.createRigidBody(desc);
   }
@@ -94,6 +97,13 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
     return this.rw.createCollider(desc, body);
   }
 
+  protected updateCollider(col: R.Collider, c: ColliderData): void {
+    col.setSensor(c.sensor);
+    col.setFriction(c.friction);
+    col.setRestitution(c.restitution);
+    col.setDensity(c.density);
+  }
+
   protected removeBody(body: R.RigidBody): void {
     this.rw.removeRigidBody(body);
   }
@@ -107,19 +117,37 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
     const p = t.position;
     const q = t.rotation;
     const l = rec.last;
-    if (p.x !== l.x || p.y !== l.y || p.z !== l.z) rec.body.setTranslation(p, true);
-    if (q.x !== l.a || q.y !== l.b || q.z !== l.c || q.w !== l.d) rec.body.setRotation(q, true);
     const rb = w.get(e, RigidBody);
-    if (!rb) return;
-    const v = rb.velocity;
-    if (rec.type === 'kinematic') {
+    if (rb && rec.type === 'kinematic') {
+      // Move (not teleport) to Transform + velocity * dt: Rapier derives the speed that carries riders.
+      const v = rb.velocity;
+      const av = rb.angularVelocity;
       rec.body.setNextKinematicTranslation({
         x: p.x + v.x * w.dt,
         y: p.y + v.y * w.dt,
         z: p.z + v.z * w.dt,
       });
-    } else if (v.x !== rec.v.x || v.y !== rec.v.y || v.z !== rec.v.z) {
+      quat.fromAxisAngle(vec3.normalize(av, axis), vec3.len(av) * w.dt, spin);
+      rec.body.setNextKinematicRotation(quat.multiply(spin, q, spin));
+    } else {
+      if (p.x !== l.x || p.y !== l.y || p.z !== l.z) rec.body.setTranslation(p, true);
+      if (q.x !== l.a || q.y !== l.b || q.z !== l.c || q.w !== l.d) rec.body.setRotation(q, true);
+    }
+    if (!rb) return;
+    const v = rb.velocity;
+    const av = rb.angularVelocity;
+    if (rec.type !== 'kinematic' && (v.x !== rec.v.x || v.y !== rec.v.y || v.z !== rec.v.z)) {
       rec.body.setLinvel(v, true);
+    }
+    const relock = rb.lockRotation !== rec.lock;
+    if (relock) {
+      rec.lock = rb.lockRotation;
+      rec.body.lockRotations(rec.lock, true);
+    }
+    // A locked body does not spin, whatever angularVelocity says (same as locked at creation).
+    const spun = av.x !== rec.av.x || av.y !== rec.av.y || av.z !== rec.av.z;
+    if (rec.type !== 'kinematic' && (relock || spun)) {
+      rec.body.setAngvel(rec.lock ? still : av, true);
     }
     rec.body.setGravityScale(rb.gravityScale, false);
     rec.body.setLinearDamping(rb.linearDamping);
@@ -143,15 +171,16 @@ export class Physics3D extends Backend<R.RigidBody, R.Collider> {
     t.rotation.z = rec.last.c = q.z;
     t.rotation.w = rec.last.d = q.w;
     const rb = w.get(e, RigidBody);
-    if (!rb) return;
+    // Kinematic velocities are game input: reading back the derived ones would compound them.
+    if (!rb || rec.type === 'kinematic') return;
     const v = rec.body.linvel();
     rb.velocity.x = rec.v.x = v.x;
     rb.velocity.y = rec.v.y = v.y;
     rb.velocity.z = rec.v.z = v.z;
     const av = rec.body.angvel();
-    rb.angularVelocity.x = av.x;
-    rb.angularVelocity.y = av.y;
-    rb.angularVelocity.z = av.z;
+    rb.angularVelocity.x = rec.av.x = av.x;
+    rb.angularVelocity.y = rec.av.y = av.y;
+    rb.angularVelocity.z = rec.av.z = av.z;
   }
 
   protected isSensor(handle: number): boolean {

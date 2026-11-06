@@ -1,3 +1,4 @@
+import { BUTTONS, isButton } from '@tessera/input';
 import { isMap, isSeq, LineCounter, type Node, parseDocument } from 'yaml';
 
 /** File access, injected so scenes load the same way in Node (CLI) and the browser (Vite). */
@@ -7,6 +8,8 @@ export interface SceneIO {
   load(path: string): Promise<Record<string, unknown>>;
   /** URL the runtime should use for an asset file (images, models, sounds). */
   url(path: string): string;
+  /** False when an asset file is missing (checked at load, with the YAML line). */
+  exists?(path: string): boolean;
 }
 
 /** Component name -> fields, as written in YAML. */
@@ -110,6 +113,46 @@ export function join(dir: string, rel: string): string {
   return out.join('/');
 }
 
+/** File names the engine loads as assets (images, models, sounds). */
+export const ASSET = /\.(png|jpe?g|webp|gif|svg|gltf|glb|mp3|ogg|wav|m4a)$/i;
+/**
+ * A relative path to an asset file, in field `label` (Component.field). URLs (`http:`, `data:`)
+ * and root paths (`/hero.png`, served as is) are not; neither is displayed text.
+ */
+const isAsset = (label: string, v: string) =>
+  label !== 'Text.text' && ASSET.test(v) && !/^([a-z]+:|\/)/i.test(v);
+
+const AXIS_KEYS = ['left', 'right', 'up', 'down', 'stick'];
+
+/** Checks `input:` bindings: button names, axis keys and sticks. */
+function checkInput(input: Record<string, unknown>, loc: Loc): void {
+  const buttons = (v: unknown, at: Loc) => {
+    if (!Array.isArray(v)) return at.fail('expected a list of buttons, e.g. [Space, PadA]');
+    for (const [i, b] of v.entries()) {
+      if (typeof b !== 'string' || !isButton(b))
+        at.at(i).fail(
+          `unknown button "${String(b)}"${suggest(String(b), BUTTONS) || ' (use KeyboardEvent.code names like KeyA, Space, ArrowLeft, or MouseLeft, PadA)'}`,
+        );
+    }
+  };
+  for (const [action, b] of Object.entries(input)) {
+    const at = loc.at(action);
+    if (!isObj(b)) {
+      buttons(b, at);
+      continue;
+    }
+    for (const [k, v] of Object.entries(b)) {
+      if (!AXIS_KEYS.includes(k))
+        at.at(k).fail(
+          `unknown axis key "${k}"${suggest(k, AXIS_KEYS)} (use ${AXIS_KEYS.join(', ')})`,
+        );
+      if (k !== 'stick') buttons(v, at.at(k));
+      else if (v !== 'PadLeft' && v !== 'PadRight')
+        at.at(k).fail(`stick must be PadLeft or PadRight, got ${JSON.stringify(v)}`);
+    }
+  }
+}
+
 const isObj = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -136,13 +179,15 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
   };
 
   let input: unknown = data.input ?? null;
+  let inputLoc = loc.at('input');
   if (typeof input === 'string') {
     const file = join(dir, input);
     files.push(file);
-    input = (await readYaml(file, io)).data;
+    ({ data: input, loc: inputLoc } = await readYaml(file, io));
   }
   if (input !== null && !isObj(input))
     return loc.at('input').fail('input must map action names to buttons');
+  if (input) checkInput(input, inputLoc);
 
   const strings: Parsed['strings'] = {};
   const rawStrings = data.strings ?? {};
@@ -168,6 +213,16 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
   const physics = data.physics ?? null;
   if (physics !== null && !isObj(physics))
     return loc.at('physics').fail('physics must be a map, e.g. { gravity: [0, -9.81] }');
+  for (const [k, v] of Object.entries(physics ?? {})) {
+    if (k !== 'gravity')
+      return loc
+        .at('physics', k)
+        .fail(`unknown physics key "${k}"${suggest(k, ['gravity'])} (use gravity)`);
+    if (!Array.isArray(v) || v.length < 2 || v.length > 3 || !v.every((n) => typeof n === 'number'))
+      return loc
+        .at('physics', k)
+        .fail(`gravity expects [x, y] or [x, y, z], got ${JSON.stringify(v)}`);
+  }
 
   const resources = data.resources ?? {};
   if (!isObj(resources))
@@ -182,10 +237,10 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
       const file = join(dir, v);
       files.push(file);
       const p = await readYaml(file, io);
-      prefabs[name] = { spec: toSpec(p.data, p.loc), loc: p.loc };
+      prefabs[name] = { spec: toSpec(p.data, p.loc, io), loc: p.loc };
     } else {
       const l = loc.at('prefabs', name);
-      prefabs[name] = { spec: toSpec(v, l), loc: l };
+      prefabs[name] = { spec: toSpec(v, l, io), loc: l };
     }
   }
 
@@ -209,7 +264,7 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
         return l.fail('each entity is a map of components (plus optional name, prefab, children)');
       const { name = '', prefab, children, ...rest } = e;
       if (typeof name !== 'string') return l.at('name').fail('name must be a string');
-      let spec = toSpec(rest, l);
+      let spec = toSpec(rest, l, io);
       if (prefab !== undefined) {
         const p = typeof prefab === 'string' ? prefabs[prefab] : undefined;
         if (!p)
@@ -238,7 +293,7 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
     input: input as Record<string, unknown> | null,
     physics: physics as Parsed['physics'],
     strings,
-    resources: toSpec(resources, loc.at('resources')),
+    resources: toSpec(resources, loc.at('resources'), io),
     prefabs,
     entities,
     files,
@@ -246,13 +301,27 @@ export async function parseScene(path: string, io: SceneIO): Promise<Parsed> {
   };
 }
 
-function toSpec(v: unknown, loc: Loc): Spec {
+/**
+ * Asset paths become runtime URLs here, resolved against the file they are written in (prefab
+ * files included; for spawn overrides from code, the prefab's file).
+ */
+export function toSpec(v: unknown, loc: Loc, io: SceneIO): Spec {
   if (!isObj(v)) loc.fail('expected a map of components');
   const spec: Spec = {};
   for (const [k, fields] of Object.entries(v)) {
     if (fields === null) spec[k] = {};
     else if (isObj(fields)) spec[k] = fields;
     else loc.at(k).fail(`${k} must be a map of fields (use {} for defaults)`);
+    const out = spec[k] as Record<string, unknown>;
+    for (const [f, val] of Object.entries(out)) {
+      if (typeof val !== 'string' || !isAsset(`${k}.${f}`, val)) continue;
+      const path = join(dirOf(loc.file), val);
+      if (io.exists?.(path) === false)
+        loc
+          .at(k, f)
+          .fail(`${k}.${f}: file not found "${val}" (paths are relative to this YAML file)`);
+      out[f] = io.url(path);
+    }
   }
   return spec;
 }
@@ -266,7 +335,7 @@ export function mergeSpec(base: Spec, over: Spec): Spec {
 }
 
 /** ` (did you mean X?)` when a close name exists. */
-export function suggest(name: string, options: string[]): string {
+export function suggest(name: string, options: readonly string[]): string {
   let best = '';
   let bestD = Math.max(2, Math.floor(name.length / 3)) + 1;
   for (const o of options) {

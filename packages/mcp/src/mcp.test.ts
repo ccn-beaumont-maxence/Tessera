@@ -116,6 +116,9 @@ describe('tess-mcp without a startup game', () => {
         arguments: { entry: 'examples/arena/scene.yaml' },
       });
       expect(JSON.stringify(opened.content)).toContain('@Game{}');
+      await c.callTool({ name: 'input', arguments: { name: 'move', down: true } });
+      const moved = await c.callTool({ name: 'step', arguments: { frames: 30, filter: 'Player' } });
+      expect(JSON.stringify(moved.content)).toMatch(/Player Transform3D\{position:\([1-9]/);
     } finally {
       await c.close();
       await idle.close();

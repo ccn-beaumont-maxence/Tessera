@@ -1,4 +1,5 @@
 import { type Game, World } from '@tessera/core';
+import { press, release } from '@tessera/input';
 import { Renderer } from './renderer';
 
 export interface StartOptions {
@@ -18,6 +19,9 @@ export interface Running {
   /** Advances exactly `n` fixed steps and redraws (works while paused). */
   step(n?: number): void;
   stop(): void;
+  /** Holds / lets go of an action or button in this game's input (tess mcp, devtools). */
+  press(name: string): void;
+  release(name: string): void;
 }
 
 const MAX_STEPS_PER_FRAME = 5;
@@ -41,6 +45,9 @@ export async function start(game: Game, options: StartOptions): Promise<Running>
       renderer.render();
     },
     stop: () => cancelAnimationFrame(raf),
+    // ponytail: same module instance as the game's, so the same Input resource token.
+    press: (name) => press(world, name),
+    release: (name) => release(world, name),
   };
 
   if (options.frames !== undefined) {
