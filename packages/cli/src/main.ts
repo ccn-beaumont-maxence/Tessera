@@ -1,11 +1,20 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { tess } from '@tessera/compiler/vite';
 import { type Game, World } from '@tessera/core';
 import { dump, runFrames } from '@tessera/headless';
-import { sceneGame } from '@tessera/scene';
+import { ASSET, sceneGame } from '@tessera/scene';
 import { chromium } from 'playwright';
 import { createServer, type ViteDevServer } from 'vite';
 import { startVitest } from 'vitest/node';
@@ -53,6 +62,8 @@ async function run(argv: string[]): Promise<number> {
   const frames = toInt(values.frames, 'frames');
   const seed = toInt(values.seed, 'seed');
   const path = resolve(entry);
+  // Load-time checks (missing files, unknown names) fail here with file:line, before any browser.
+  const game = await loadGame(path);
 
   if (values.screenshot) {
     const out = resolve(values.screenshot);
@@ -61,7 +72,7 @@ async function run(argv: string[]): Promise<number> {
   }
   if (values.dump || !values.screenshot) {
     const world = new World({ seed });
-    await (await loadGame(path)).setup(world);
+    await game.setup(world);
     runFrames(world, frames);
     console.log(values.dump ? dump(world) : `ran ${frames} frames`);
   }
@@ -85,6 +96,7 @@ export async function loadGame(path: string): Promise<Game> {
       read: async (p) => readFileSync(p, 'utf8'),
       load: importer,
       url: (p) => relative(process.cwd(), p),
+      exists: existsSync,
     });
   }
   const game = (await importer(path)).default as Partial<Game> | undefined;
@@ -124,17 +136,26 @@ try {
 export async function serve(root: string, port = 0, index?: string): Promise<ViteDevServer> {
   const require = createRequire(import.meta.url);
   const html = PAGE(require.resolve('@tessera/render'), require.resolve('@tessera/scene'));
+  // Own dependency cache per server: servers sharing one (tests, `tess dev` + MCP) re-optimize
+  // under each other and the page gets 504 "Outdated Optimize Dep".
+  const cacheDir = mkdtempSync(join(tmpdir(), 'tess-vite-'));
   const server = await createServer({
     configFile: false,
     logLevel: 'error',
     root,
+    cacheDir,
     server: { port, fs: { strict: false } },
     plugins: [
       tess(),
       {
         name: 'tess-page',
         // YAML is fetched, not imported: tell the page instead of letting Vite reload it.
+        // Assets are fetched too (Vite ignores them): reload the page to load the new file.
         handleHotUpdate({ file, server: s }) {
+          if (ASSET.test(file)) {
+            s.ws.send({ type: 'full-reload' });
+            return [];
+          }
           if (!isScene(file)) return;
           s.ws.send({ type: 'custom', event: 'tess:yaml', data: { file } });
           return [];
@@ -155,6 +176,11 @@ export async function serve(root: string, port = 0, index?: string): Promise<Vit
       },
     ],
   });
+  const close = server.close.bind(server);
+  server.close = async () => {
+    await close();
+    rmSync(cacheDir, { recursive: true, force: true });
+  };
   await server.listen();
   return server;
 }

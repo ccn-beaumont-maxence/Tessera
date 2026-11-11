@@ -18,7 +18,7 @@ TypeScript) ou en TypeScript. Objectif : peu de tokens par jeu, réussite au pre
 5. Pour un jeu en cours d'exécution, utiliser le serveur MCP `tessera` (ci-dessous).
 
 Tests headless d'un jeu : `loadExample` (`examples/load.ts`), `runFrames`, `dump`, `find`,
-`assertComponent` (`@tessera/headless`), `press`/`release` (`@tessera/input`). Voir
+`assertComponent` (`@tessera/headless`), `press`/`release` (`@tessera/input` ; action, `move.left` ou code de touche). Voir
 `examples/platformer/platformer.test.ts`.
 
 ## Serveur MCP
@@ -26,6 +26,8 @@ Tests headless d'un jeu : `loadExample` (`examples/load.ts`), `runFrames`, `dump
 `node packages/mcp/bin/tess-mcp.js [scene.yaml] [--headed]` lance le jeu dans Chromium.
 Outils : `open` (choisir le jeu), `state`, `inspect`, `set`, `step`, `run`, `input`,
 `screenshot`, `logs`, `reload`. Le jeu se met en pause sur une erreur d'exécution.
+`input` prend une action (`jump`), une direction d'action d'axe (`move.left`) ou un code de touche
+(`ArrowLeft`) ; un nom inconnu est une erreur.
 Déjà configuré pour Claude Code (`.mcp.json`) et Cursor (`.cursor/mcp.json`). Pour Codex,
 dans `~/.codex/config.toml` :
 

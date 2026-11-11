@@ -12,7 +12,7 @@ import {
 import { dump, find } from '@tessera/headless';
 import { isDown, press } from '@tessera/input';
 import { RigidBody } from '@tessera/physics';
-import { Sprite } from '@tessera/render';
+import { Sprite, Text } from '@tessera/render';
 import { describe, expect, it } from 'vitest';
 import { parseScene, type SceneIO } from './parse';
 import { build, currentScene, loadScene, reload, sceneGame, spawnPrefab } from './scene';
@@ -297,6 +297,136 @@ entities:
         '/game/b.yaml': 'dimension: 3d\n',
       }),
     ).rejects.toThrow('scene.yaml:2: /game/b.yaml is 3d, scenes must all be 2d');
+  });
+
+  const loadError = (over: Record<string, string>) =>
+    load(over).then(
+      () => 'no error',
+      (e: Error) => e.message,
+    );
+
+  it('resolves prefab asset paths against the prefab file, placed or spawned', async () => {
+    const { w } = await load({
+      '/game/scene.yaml':
+        'dimension: 2d\nprefabs: { Coin: ./p/coin.yaml }\nentities:\n  - prefab: Coin\n',
+      '/game/p/coin.yaml': 'Sprite: { image: ./coin.png }\n',
+    });
+    expect(w.get(find(w, ''), Sprite)?.image).toBe('url:/game/p/coin.png');
+    expect(w.get(spawnPrefab(w, 'Coin'), Sprite)?.image).toBe('url:/game/p/coin.png');
+  });
+
+  it('reports missing asset files at load when the IO can check them', async () => {
+    const io = { ...memoryIO(files), exists: (p: string) => p !== '/game/hero.png' };
+    await expect(parseScene('/game/scene.yaml', io)).rejects.toThrow(
+      '/game/scene.yaml:13: Sprite.image: file not found "./hero.png" (paths are relative to this YAML file)',
+    );
+    // Displayed text and root paths (served as is) are not files to check.
+    const other = {
+      '/game/scene.yaml':
+        'dimension: 2d\nentities:\n  - Text: { text: save.png }\n    Sprite: { image: /hero.png }\n',
+    };
+    const w = new World();
+    const none = { ...memoryIO(other), exists: () => false };
+    await build(w, await parseScene('/game/scene.yaml', none), none);
+    expect(w.get(find(w, ''), Text)?.text).toBe('save.png');
+    expect(w.get(find(w, ''), Sprite)?.image).toBe('/hero.png');
+  });
+
+  it('rejects physics on a child entity at load', async () => {
+    expect(
+      await loadError({
+        '/game/scene.yaml':
+          'dimension: 2d\nentities:\n  - name: P\n    Transform2D: {}\n    children:\n      - Transform2D: {}\n        Collider: {}\n',
+      }),
+    ).toBe(
+      '/game/scene.yaml:7: Collider on a child entity: physics bodies must be root entities (move it out of children:, or put it on the parent)',
+    );
+  });
+
+  it('checks enum fields at load', async () => {
+    const head = 'dimension: 3d\nentities:\n';
+    expect(await loadError({ '/game/scene.yaml': `${head}  - Mesh: { shape: cube }\n` })).toBe(
+      '/game/scene.yaml:3: Mesh.shape must be box, sphere, plane, capsule, cylinder, cone, ico, got "cube" (did you mean cone?)',
+    );
+    expect(await loadError({ '/game/scene.yaml': `${head}  - Light: { kind: pont }\n` })).toContain(
+      'got "pont" (did you mean point?)',
+    );
+  });
+
+  it('suggests sphere for a 2D circle Collider, with the YAML line', async () => {
+    expect(
+      await loadError({
+        '/game/scene.yaml': 'dimension: 2d\nentities:\n  - Collider: { shape: circle }\n',
+      }),
+    ).toBe(
+      '/game/scene.yaml:3: Collider.shape must be box, sphere, capsule, got "circle" (sphere is a circle in 2D)',
+    );
+  });
+
+  it('checks prefab fields at load, before any spawn', async () => {
+    expect(
+      await loadError({
+        '/game/scene.yaml': 'dimension: 2d\nprefabs:\n  Bad: { Sprite: { colr: red } }\n',
+      }),
+    ).toContain('/game/scene.yaml:3: unknown field "colr" in Sprite (did you mean color?)');
+  });
+
+  it('checks physics and input keys', async () => {
+    expect(
+      await loadError({ '/game/scene.yaml': 'dimension: 2d\nphysics: { gravty: [0, 0] }\n' }),
+    ).toBe(
+      '/game/scene.yaml:2: unknown physics key "gravty" (did you mean gravity?) (use gravity)',
+    );
+    expect(await loadError({ '/game/input.yaml': 'jump: [Spcae]\n' })).toBe(
+      '/game/input.yaml:1: unknown button "Spcae" (did you mean Space?)',
+    );
+    expect(await loadError({ '/game/input.yaml': 'move: { rigth: [KeyD] }\n' })).toContain(
+      'unknown axis key "rigth" (did you mean right?)',
+    );
+    expect(await loadError({ '/game/input.yaml': 'move: { stick: PadLft }\n' })).toBe(
+      '/game/input.yaml:1: stick must be PadLeft or PadRight, got "PadLft"',
+    );
+  });
+
+  it('rejects script systems that no scene lists', async () => {
+    expect(
+      await loadError({ '/game/scene.yaml': SCENE.replace('systems: [Walk]', 'systems: []') }),
+    ).toBe(
+      '/game/scene.yaml:3: system "Walk" from scripts never runs: add it to systems: (they run in that order)',
+    );
+  });
+
+  it('rejects the camera of the other dimension', async () => {
+    expect(
+      await loadError({ '/game/scene.yaml': 'dimension: 2d\nentities:\n  - Camera3D: {}\n' }),
+    ).toBe('/game/scene.yaml:3: Camera3D does nothing in a dimension: 2d scene (use Camera2D)');
+  });
+
+  it('hot-reloads every scene of the game, not only the running one', async () => {
+    const level2 =
+      'dimension: 2d\nscripts: [./game.ts]\nsystems: [Walk]\nentities:\n  - { name: Boss, Transform2D: {} }\n';
+    const scene = SCENE.replace('systems: [Walk]', 'scenes: [./level2.yaml]\nsystems: [Walk]');
+    const all = { ...files, '/game/scene.yaml': scene, '/game/level2.yaml': level2 };
+    const { w } = await load(all);
+    const edited = { ...all, '/game/scene.yaml': scene.replace('rotation: 0.5', 'rotation: 1') };
+    expect(reload(w, await parseScene('/game/scene.yaml', memoryIO(edited)))).toBe(true);
+    const edited2 = { ...edited, '/game/level2.yaml': level2.replace('{}', '{ rotation: 2 }') };
+    expect(reload(w, await parseScene('/game/level2.yaml', memoryIO(edited2)))).toBe(true);
+    loadScene(w, 'level2.yaml');
+    w.step();
+    expect(w.get(find(w, 'Boss'), Transform2D)?.rotation).toBe(2);
+    loadScene(w, 'scene.yaml');
+    w.step();
+    expect(w.get(find(w, 'Hero'), Transform2D)?.rotation).toBe(1);
+  });
+
+  it('asks for a restart when a reload needs physics that no scene loaded', async () => {
+    const b = 'dimension: 2d\nentities:\n  - Transform2D: {}\n';
+    const io = memoryIO({ '/a.yaml': 'dimension: 2d\nscenes: [./b.yaml]\n', '/b.yaml': b });
+    const w = new World();
+    await build(w, await parseScene('/a.yaml', io), io);
+    const io2 = memoryIO({ '/b.yaml': `${b}    Collider: {}\n` });
+    expect(reload(w, await parseScene('/b.yaml', io2))).toBe(false);
   });
 
   it('spawns prefabs at runtime with overrides', async () => {

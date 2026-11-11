@@ -38,14 +38,19 @@ Spawn prefabs at runtime with `spawn("Coin", Transform2D { position = p })` in T
 
 Vectors `[x, y]` or `[x, y, z]` (missing components keep their default), rotations `[rx, ry, rz]`
 Euler radians or `[x, y, z, w]`, colors `'#rrggbb'` or `[r, g, b, a]` (0..1), asset paths relative
-to the YAML file. Only the fields you write change; the rest keep the component defaults.
+to the YAML file they are written in (a prefab file's paths are relative to that file; `/x.png` and
+URLs are used as is); a missing file is a load error in `tess run` and tests. Only the fields you write change; the rest keep the component defaults.
+
+Input buttons are KeyboardEvent.code names (KeyA, Space, ArrowLeft, ShiftLeft, Digit1, F1, Numpad…),
+MouseLeft/Middle/Right or PadA/B/X/Y/LB/RB/LT/RT/Back/Start/Up/Down/Left/Right; axes take
+left/right/up/down lists and stick: PadLeft|PadRight. `physics:` only takes gravity [x, y(, z)].
 
 ## Engine components
 
 | Component | Fields (defaults) |
 | --- | --- |
 | Transform2D | position [0,0], rotation 0 (radians), scale [1,1] |
-| Parent | entity (set by `children:`; the transform becomes local to that entity's; physics bodies ignore it, keep them on root entities) |
+| Parent | entity (set by `children:`; the transform becomes local to that entity's; a RigidBody/Collider on an entity with a Parent is an error: keep physics on root entities) |
 | Transform3D | position [0,0,0], rotation identity, scale [1,1,1] |
 | Timer | duration 1, time 0, repeat false, destroy false, done (true on the step it elapses; then stops, or restarts with repeat; destroy removes the entity) |
 | Particles | rate 10 (per s), burst 0 (emitted once, then reset), lifetime 1, speed 2, spread 0.785 (cone around +Y, radians; 6.3 = all directions), gravity 0, color/endColor white, size 0.2, endSize 0, max 100 |
@@ -60,8 +65,12 @@ to the YAML file. Only the fields you write change; the rest keep the component 
 | Camera3D | fov 60, near 0.1, far 1000, background '#1b1d26', fog 0 (meters to fade into background; 0 = off), bloom 0 (glow of bright/emissive colors; 0 = off) |
 | Light | kind directional/point/ambient, color white, intensity 1 (directional shines along -Z) |
 | RigidBody | type dynamic/fixed/kinematic, velocity, angularVelocity, gravityScale 1, linearDamping 0, lockRotation false |
-| Collider | shape box/sphere/capsule, size [1,1,1] (full extent; sphere/capsule diameter = x), sensor false, friction 0.5, restitution 0, density 1 |
+| Collider | shape box/sphere (circle in 2D)/capsule, size [1,1,1] (full extent; sphere/capsule diameter = x), sensor false, friction 0.5, restitution 0, density 1 |
 
-A Collider without RigidBody is fixed. Without a camera entity a default one is used; without
+A Collider without RigidBody is fixed. Kinematic: move by velocity/angularVelocity or by setting the
+Transform each frame; riders are carried. Editing Collider or lockRotation at runtime takes effect
+next step. Destroying or removing a touching collider sends Collision{started:false}. Without a camera entity a default one is used; without
 lights, default lighting. `Input`, `Timers` then `Particles` run first, `Physics` and `SpriteAnimate` last, unless you list
-them in `systems:`. In `tess dev`, saving the YAML updates the running game without a reload.
+them in `systems:`. Every system exported by `scripts` must be listed in `systems:` of some scene of
+the game, or loading fails. Camera3D is rejected in 2D scenes, Camera2D in 3D scenes. In `tess dev`, saving the YAML updates the running game without a reload. Edits to other
+scenes listed under `scenes:` apply on the next loadScene().

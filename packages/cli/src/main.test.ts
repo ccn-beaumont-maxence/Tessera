@@ -2,6 +2,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { sceneMain } from './build';
 import { launch, loadGame, main, pageUrl, serve } from './main';
 
 const example = (name: string) =>
@@ -82,6 +83,7 @@ describe('YAML scenes', () => {
     const dir = resolve(import.meta.dirname, '../.tmp/hmr');
     rmSync(dir, { recursive: true, force: true });
     cpSync(resolve(sceneFile, '..'), dir, { recursive: true });
+    cpSync(resolve(sceneFile, '../../platformer/hero.png'), join(dir, 'hero.png'));
     const file = join(dir, 'scene.yaml');
     const server = await serve(dir);
     const browser = await launch();
@@ -120,6 +122,15 @@ describe('YAML scenes', () => {
         { timeout: 10_000 },
       );
       expect(await page.evaluate(() => (globalThis as { marker?: number }).marker)).toBe(1);
+      // An edited image is fetched again: the page reloads.
+      writeFileSync(join(dir, 'hero.png'), readFileSync(join(dir, 'hero.png')));
+      await page.waitForFunction(
+        () => (globalThis as { marker?: number }).marker === undefined,
+        null,
+        {
+          timeout: 10_000,
+        },
+      );
     } finally {
       await browser.close();
       await server.close();
@@ -198,6 +209,16 @@ describe('tess build and tess test', () => {
       await browser.close();
       await server.close();
     }
+  });
+
+  it('bundles the other scenes listed under scenes:', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tess-scenes-'));
+    writeFileSync(join(dir, 'a.yaml'), 'dimension: 2d\nscenes: [./b.yaml]\n');
+    writeFileSync(join(dir, 'b.yaml'), 'dimension: 2d\nscripts: [./b.ts]\n');
+    const main = await sceneMain(join(dir, 'a.yaml'), 'render', 'scene');
+    expect(main).toContain(JSON.stringify(join(dir, 'b.yaml')));
+    expect(main).toContain(`import * as s0 from ${JSON.stringify(join(dir, 'b.ts'))};`);
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('runs project tests with .tess support', { timeout: 120_000 }, async () => {

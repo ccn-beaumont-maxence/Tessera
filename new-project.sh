@@ -58,18 +58,14 @@ export default defineConfig({ plugins: [tess()], test: { include: ['game/**/*.te
 EOF
 
 cat > game/game.test.ts <<'EOF'
-import { readFileSync } from 'node:fs';
+import { loadGame } from '@tessera/cli';
 import { World } from '@tessera/core';
 import { dump, runFrames } from '@tessera/headless';
-import { sceneGame } from '@tessera/scene';
 import { expect, it } from 'vitest';
 
 it('runs 120 frames', async () => {
-  const game = await sceneGame(`${import.meta.dirname}/scene.yaml`, {
-    read: async (p) => readFileSync(p, 'utf8'),
-    load: (p) => import(/* @vite-ignore */ p),
-    url: (p) => p,
-  });
+  // Same loader as `tess run`: missing image/model/sound files fail with file:line.
+  const game = await loadGame(`${import.meta.dirname}/scene.yaml`);
   const w = new World({ seed: 1 });
   await game.setup(w);
   runFrames(w, 120);

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
 import type { Decl, Expr, Stmt, TypeRef } from './ast';
 import { ENGINE, SCALARS, type StructInfo, TS_TYPE, VALUE } from './engine';
-import { type Pos, TessError } from './lexer';
+import { type Pos, suggest, TessError } from './lexer';
 import { parse } from './parser';
 import { sourceMap } from './sourcemap';
 
@@ -210,7 +210,7 @@ class Compiler {
         }
         this.structs.set(d.name, { kind: d.kind, fields, module: null });
       } else if (d.kind === 'function') {
-        if (d.ret.name !== 'void') this.checkType(d.ret);
+        if (d.ret.name !== 'void') this.checkType(d.ret, ['system']);
         for (const p of d.params) this.checkType(p.type);
         this.fns.set(d.name, {
           ret: d.ret.name,
@@ -228,16 +228,19 @@ class Compiler {
     return e;
   }
 
-  private checkType(t: TypeRef): void {
+  private checkType(t: TypeRef, extra: string[] = []): void {
     if (SCALARS.includes(t.name) || isValue(t.name) || this.structs.has(t.name) || ENGINE[t.name])
       return;
-    const known = [
-      ...SCALARS,
-      ...Object.keys(VALUE),
-      ...this.structs.keys(),
-      ...Object.keys(ENGINE),
-    ];
-    this.fail(`unknown type "${t.name}"${suggest(t.name, known)}`, t);
+    this.unknownType(t.name, t, [...SCALARS, ...Object.keys(VALUE), ...extra]);
+  }
+
+  /** `extra`: names valid here besides structs (scalars and values where any type fits). */
+  private unknownType(name: string, at: Pos, extra: string[] = []): never {
+    const known = [...this.structs.keys(), ...Object.keys(ENGINE), ...extra];
+    const hint =
+      suggest(name, known) ||
+      `: declare it, or add \`using "./file.tess";\` for the file that declares it`;
+    return this.fail(`unknown type "${name}"${hint}`, at);
   }
 
   // ---------------------------------------------------------------- declarations
@@ -276,8 +279,8 @@ class Compiler {
     const b = this.body('const');
     this.constCtx = true;
     const v = this.expr(d.value, b);
-    this.expectType(v, d.type.name, d.value);
-    const js = isValue(d.type.name) ? this.freshValue(v, b) : v.js;
+    const checked = this.expectType(v, d.type.name, d.value);
+    const js = isValue(d.type.name) ? this.freshValue(v, b) : checked;
     this.constCtx = false;
     this.out.push({ text: `export const ${d.name} = ${this.once(js, b)};`, pos: d });
     this.consts.set(d.name, {
@@ -296,8 +299,8 @@ class Compiler {
       const ty = f.type.name;
       if (!f.init) return `${f.name}: ${this.zero(ty, f)}`;
       const v = this.expr(f.init, b);
-      this.expectType(v, ty, f.init);
-      return `${f.name}: ${isValue(ty) ? this.freshValue(v, b) : v.js}`;
+      const js = this.expectType(v, ty, f.init);
+      return `${f.name}: ${isValue(ty) ? this.freshValue(v, b) : js}`;
     });
     this.constCtx = false;
     if (b.temps > 0) this.fail('field defaults must be simple values', d);
@@ -348,8 +351,8 @@ class Compiler {
         );
         continue;
       }
-      const info = this.struct(ty);
-      if (!info || info.kind === 'event' || info.kind === 'struct') {
+      const info = this.struct(ty) ?? this.unknownType(ty, p.type);
+      if (info.kind === 'event' || info.kind === 'struct') {
         this.fail(
           `system parameter "${p.name}" must be Entity, a component or a resource (got ${ty})`,
           p,
@@ -547,20 +550,15 @@ class Compiler {
     const init = pre !== undefined ? pre : s.init ? this.expr(s.init, b) : null;
     const ty = s.type?.name ?? (init as R).ty;
     if (ty === 'void' || ty === 'none') this.fail(`cannot infer a type for "${s.name}"`, s);
-    if (init) this.expectType(init, ty, s.init as Expr);
+    const js = init ? this.expectType(init, ty, s.init as Expr) : this.zero(ty);
     const struct = !SCALARS.includes(ty) && !isValue(ty);
     if (struct && !init)
       this.fail(`"${s.name}" needs a value, e.g. ${ty}& ${s.name} = get<${ty}>(e);`, s);
     // `T x = get<T>(e)` is read-only like a by-value parameter; `T& x` or `auto x` keep write access.
-    const writable = !struct || (s.type ? s.type.ref : (init?.writable ?? false));
-    this.declareVar(
-      b,
-      { name: s.name, ty, js: s.name, writable, hint: `declare it "${ty}& ${s.name}"` },
-      s,
-    );
-    let js = init ? init.js : this.zero(ty);
-    if (ty === 'int' && init?.ty === 'float') js = `Math.trunc(${js})`;
-    return `let ${s.name} = ${js}`;
+    const writable = !s.const && (!struct || (s.type ? s.type.ref : (init?.writable ?? false)));
+    const hint = s.const ? 'constants are read-only' : `declare it "${ty}& ${s.name}"`;
+    this.declareVar(b, { name: s.name, ty, js: s.name, writable, hint }, s);
+    return `${s.const ? 'const' : 'let'} ${s.name} = ${js}`;
   }
 
   private varStmt(s: Extract<Stmt, { kind: 'var' }>, b: Body): void {
@@ -571,7 +569,8 @@ class Compiler {
     if (vty && isValue(vty)) {
       if (init) this.expectType(init, vty, s.init as Expr);
       const obj = this.scratchOf(vty);
-      this.declareVar(b, { name: s.name, ty: vty, js: obj, writable: true, hint: '' }, s);
+      const hint = 'constants are read-only';
+      this.declareVar(b, { name: s.name, ty: vty, js: obj, writable: !s.const, hint }, s);
       const comps = init
         ? this.comps(init, b)
         : (VALUE[vty]?.map((k) => (k === 'w' || k === 'a' ? '1' : '0')) ?? []);
@@ -593,12 +592,12 @@ class Compiler {
     }
     if (!s.value) this.fail(`return a ${b.ret}`, s);
     const v = this.expr(s.value, b);
-    this.expectType(v, b.ret, s.value);
+    const js = this.expectType(v, b.ret, s.value);
     if (isValue(b.ret)) {
       this.storeComps(b, '$out', b.ret, this.comps(v, b), s);
       return this.emit(b, 'return $out;', s);
     }
-    this.emit(b, `return ${v.js};`, s);
+    this.emit(b, `return ${js};`, s);
   }
 
   private query(s: Extract<Stmt, { kind: 'query' }>, b: Body): void {
@@ -620,8 +619,8 @@ class Compiler {
         this.declareVar(inner, { name: v.name, ty, js: v.name, writable: false, hint: '' }, v);
         continue;
       }
-      const info = this.struct(ty);
-      if (info?.kind !== 'component')
+      const info = this.struct(ty) ?? this.unknownType(ty, v.type);
+      if (info.kind !== 'component')
         this.fail(`query variables must be Entity or components (got ${ty})`, v);
       terms.push(v.type.ref ? `${this.use('@tessera/core', 'mut')}(${ty})` : ty);
       params.push(v.name);
@@ -647,8 +646,8 @@ class Compiler {
   }
 
   private events(s: Extract<Stmt, { kind: 'events' }>, b: Body): void {
-    const info = this.struct(s.event);
-    if (info?.kind !== 'event') this.fail(`"${s.event}" is not an event`, s);
+    const info = this.struct(s.event) ?? this.unknownType(s.event, s);
+    if (info.kind !== 'event') this.fail(`"${s.event}" is not an event`, s);
     if (s.var.type.name !== s.event)
       this.fail(`loop variable must be "${s.event} ${s.var.name}"`, s.var);
     const n = b.temps + 1;
@@ -752,11 +751,8 @@ class Compiler {
 
   private scalarAssign(e: Extract<Expr, { kind: 'assign' }>, t: R, b: Body): string {
     const v = this.expr(e.value, b);
-    if (e.op === '=') {
-      this.expectType(v, t.ty, e.value);
-      return `${t.js} = ${t.ty === 'int' && v.ty === 'float' ? `Math.trunc(${v.js})` : v.js}`;
-    }
-    if (t.ty === 'string' && e.op === '+=') return `${t.js} += ${v.js}`;
+    if (e.op === '=') return `${t.js} = ${this.expectType(v, t.ty, e.value)}`;
+    if (t.ty === 'string' && e.op === '+=') return `${t.js} += ${this.text(v, b, e.value)}`;
     if (!isNum(t.ty) || !isNum(v.ty)) this.fail(`${t.ty} ${e.op} ${v.ty} is not supported`, e);
     const op = e.op[0] as string;
     if (t.ty === 'int' && (v.ty === 'float' || op === '/'))
@@ -835,11 +831,27 @@ class Compiler {
     return { ty, js: '', comps };
   }
 
-  private expectType(v: R, ty: string, at: Pos): void {
-    if (v.ty === ty) return;
-    if (isNum(v.ty) && isNum(ty)) return;
-    if (v.ty === 'none' && ty === 'Entity') return;
-    this.fail(`expected ${ty}, got ${v.ty}`, at);
+  /** Checks that `v` fits `ty`; returns its js, truncated when a float goes into an int. */
+  private expectType(v: R, ty: string, at: Pos): string {
+    if (v.ty === ty) return v.js;
+    if (isNum(v.ty) && isNum(ty)) return ty === 'int' ? `Math.trunc(${v.js})` : v.js;
+    if (v.ty === 'none' && ty === 'Entity') return v.js;
+    const fix =
+      ty === 'vec3' && v.ty === 'vec2'
+        ? ': write vec3(v.x, v.y, 0)'
+        : ty === 'vec2' && v.ty === 'vec3'
+          ? ': write vec2(v.x, v.y)'
+          : '';
+    return this.fail(`expected ${ty}, got ${v.ty}${fix}`, at);
+  }
+
+  /** Type of `c ? x : y`: int with float gives float, none with Entity gives Entity. */
+  private join(x: R, y: R, at: Pos): string {
+    const num = isNum(x.ty) && isNum(y.ty);
+    const ty = num ? (x.ty === y.ty ? x.ty : 'float') : x.ty === 'none' ? y.ty : x.ty;
+    this.expectType(x, ty, at);
+    this.expectType(y, ty, at);
+    return ty;
   }
 
   private lookup(name: string, b: Body): Var | undefined {
@@ -894,8 +906,8 @@ class Compiler {
         const c = this.cond(e.cond, b);
         const x = this.expr(e.then, b);
         const y = this.expr(e.else, b);
-        this.expectType(y, x.ty, e.else);
-        if (isValue(x.ty)) {
+        const ty = this.join(x, y, e.else);
+        if (isValue(ty)) {
           const s = this.repeatable(c, b);
           const xc = this.comps(x, b);
           const yc = this.comps(y, b);
@@ -904,7 +916,7 @@ class Compiler {
             xc.map((xi, i) => `(${i === 0 ? s.first : s.ref} ? ${xi} : ${yc[i]})`),
           );
         }
-        return { ty: x.ty === 'none' ? y.ty : x.ty, js: `(${c} ? ${x.js} : ${y.js})` };
+        return { ty, js: `(${c} ? ${x.js} : ${y.js})` };
       }
       case 'binary':
         return this.binary(e, b);
@@ -946,7 +958,8 @@ class Compiler {
     if (keys) {
       const i = keys.indexOf(e.name);
       if (i < 0) this.fail(`${o.ty} has no field "${e.name}" (fields: ${keys.join(', ')})`, e);
-      if (o.js && isPure(o.js))
+      // A pure object, or an lvalue such as get<T>(e).position, evaluated once by the assignment.
+      if (o.js && (o.lvalue || isPure(o.js)))
         return {
           ty: 'float',
           js: `${o.js}.${e.name}`,
@@ -996,7 +1009,7 @@ class Compiler {
       return { ty: 'bool', js: `(${l.js} ${op} ${r.js})` };
     }
     if (op === '+' && (l.ty === 'string' || r.ty === 'string'))
-      return { ty: 'string', js: `(${l.js} + ${r.js})` };
+      return { ty: 'string', js: `(${this.text(l, b, e.left)} + ${this.text(r, b, e.right)})` };
     if (isNum(l.ty) && isNum(r.ty)) {
       const int = l.ty === 'int' && r.ty === 'int';
       if (op === '/' && int) return { ty: 'int', js: `Math.trunc(${l.js} / ${r.js})` };
@@ -1036,6 +1049,20 @@ class Compiler {
     return this.fail(`${l.ty} ${op} ${r.ty} is not supported`, e);
   }
 
+  /** One operand of a string `+`: value types print as (x, y); components are rejected. */
+  private text(v: R, b: Body, at: Pos): string {
+    if (isValue(v.ty))
+      return `"(" + ${this.comps(v, b)
+        .map((c) => `(${c})`)
+        .join(' + ", " + ')} + ")"`;
+    if (SCALARS.includes(v.ty) || v.ty === 'none') return v.js;
+    const field = this.struct(v.ty)?.fields.keys().next().value;
+    return this.fail(
+      `cannot add ${v.ty} to a string${field ? `: add one of its fields, e.g. ${show(at as Expr)}.${field}` : ''}`,
+      at,
+    );
+  }
+
   // ---------------------------------------------------------------- calls
 
   private args(
@@ -1057,7 +1084,7 @@ class Compiler {
       if (ty === 'num') {
         if (!isNum(v.ty))
           this.fail(`${e.name}() argument ${i + 1} must be a number, got ${v.ty}`, a);
-      } else if (ty !== 'any') this.expectType(v, ty, a);
+      } else if (ty !== 'any') return { ...v, js: this.expectType(v, ty, a) };
       return v;
     });
   }
@@ -1069,8 +1096,8 @@ class Compiler {
   private typeArg(e: Extract<Expr, { kind: 'call' }>, kind: 'component' | 'event'): string {
     const t = e.typeArg;
     if (!t) return this.fail(`${e.name} needs a type: ${e.name}<Name>(...)`, e);
-    const info = this.struct(t);
-    if (!info || info.kind !== kind) this.fail(`"${t}" is not a ${kind}`, e);
+    const info = this.struct(t) ?? this.unknownType(t, e);
+    if (info.kind !== kind) this.fail(`"${t}" is not a ${kind}`, e);
     return t;
   }
 
@@ -1092,7 +1119,8 @@ class Compiler {
     switch (n) {
       case 'clamp': {
         const [x, lo, hi] = this.args(e, b, ['num', 'num', 'num']) as [R, R, R];
-        return { ty: x.ty, js: `Math.min(Math.max(${x.js}, ${lo.js}), ${hi.js})` };
+        const ty = x.ty === 'int' && lo.ty === 'int' && hi.ty === 'int' ? 'int' : 'float';
+        return { ty, js: `Math.min(Math.max(${x.js}, ${lo.js}), ${hi.js})` };
       }
       case 'float':
         return { ty: 'float', js: (this.args(e, b, ['num'])[0] as R).js };
@@ -1246,6 +1274,7 @@ class Compiler {
         const lit = e.args[0];
         if (e.args.length !== 1 || lit?.kind !== 'struct')
           this.fail('emit takes one event literal: emit(Hit { target = e })', e);
+        if (!this.structs.has(lit.name) && !ENGINE[lit.name]) this.unknownType(lit.name, lit);
         const info = this.structs.get(lit.name);
         if (info?.kind !== 'event')
           this.fail(`"${lit.name}" is not an event: declare it with \`event\``, lit);
@@ -1509,8 +1538,8 @@ class Compiler {
     const parts = lits.map((lit) => {
       if (lit.kind !== 'struct')
         this.fail('spawn overrides are component literals: Transform2D { position = p }', lit);
-      const info = this.struct(lit.name);
-      if (info?.kind !== 'component') this.fail(`"${lit.name}" is not a component`, lit);
+      const info = this.struct(lit.name) ?? this.unknownType(lit.name, lit);
+      if (info.kind !== 'component') this.fail(`"${lit.name}" is not a component`, lit);
       b.writes.add(lit.name);
       return `${lit.name}: ${this.literal(lit, b, false)}`;
     });
@@ -1531,9 +1560,9 @@ class Compiler {
           f.pos,
         );
       const v = this.expr(f.value, b);
-      this.expectType(v, ty, f.pos);
+      const checked = this.expectType(v, ty, f.pos);
       // Events outlive the frame, so they get fresh objects; spawn() copies fields itself.
-      const js = isValue(ty) ? (copy ? this.fresh(ty, this.comps(v, b)) : this.obj(v)) : v.js;
+      const js = isValue(ty) ? (copy ? this.fresh(ty, this.comps(v, b)) : this.obj(v)) : checked;
       return `${f.name}: ${js}`;
     });
     return `{ ${fields.join(', ')} }`;
@@ -1545,34 +1574,4 @@ function show(e: Expr): string {
   if (e.kind === 'member') return `${show(e.obj)}.${e.name}`;
   if (e.kind === 'call') return `${e.name}(...)`;
   return 'expression';
-}
-
-/** ` (did you mean X?)` when a close name exists. */
-export function suggest(name: string, options: string[]): string {
-  let best = '';
-  let bestD = Math.max(2, Math.floor(name.length / 3)) + 1;
-  for (const o of new Set(options)) {
-    const d = distance(name.toLowerCase(), o.toLowerCase());
-    if (d < bestD) {
-      bestD = d;
-      best = o;
-    }
-  }
-  return best ? ` (did you mean ${best}?)` : '';
-}
-
-function distance(a: string, b: string): number {
-  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    const cur = [i];
-    for (let j = 1; j <= b.length; j++) {
-      cur[j] = Math.min(
-        (prev[j] as number) + 1,
-        (cur[j - 1] as number) + 1,
-        (prev[j - 1] as number) + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
-    }
-    prev = cur;
-  }
-  return prev[b.length] as number;
 }

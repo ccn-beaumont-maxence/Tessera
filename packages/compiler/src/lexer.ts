@@ -109,6 +109,8 @@ export function lex(src: string, file: string): Token[] {
       i = j;
       continue;
     }
+    const hex = /^0[xX][0-9a-fA-F]+/.exec(src.slice(i, i + 20));
+    if (hex) fail(`Tess has no hex numbers: write ${Number(hex[0])}`);
     if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] ?? ''))) {
       const m = /^(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?f?/.exec(src.slice(i)) as RegExpExecArray;
       out.push({ kind: 'number', text: m[0].replace(/f$/, ''), ...start });
@@ -131,4 +133,34 @@ export function lex(src: string, file: string): Token[] {
   }
   out.push({ kind: 'eof', text: '', ...pos() });
   return out;
+}
+
+/** ` (did you mean X?)` when a close name exists. */
+export function suggest(name: string, options: string[]): string {
+  let best = '';
+  let bestD = Math.max(2, Math.floor(name.length / 3)) + 1;
+  for (const o of new Set(options)) {
+    const d = distance(name.toLowerCase(), o.toLowerCase());
+    if (d < bestD) {
+      bestD = d;
+      best = o;
+    }
+  }
+  return best ? ` (did you mean ${best}?)` : '';
+}
+
+function distance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(
+        (prev[j] as number) + 1,
+        (cur[j - 1] as number) + 1,
+        (prev[j - 1] as number) + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = cur;
+  }
+  return prev[b.length] as number;
 }

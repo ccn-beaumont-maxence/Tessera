@@ -6,7 +6,8 @@ export type Shape = 'box' | 'sphere' | 'capsule';
 /**
  * Simulated body. Same fields in 2D and 3D: in 2D, z is ignored and spin is `angularVelocity.z`.
  * Velocities are read back after each step, so writing `velocity` steers the body.
- * Kinematic bodies move by `velocity` and push dynamic ones.
+ * Kinematic bodies move by `velocity`/`angularVelocity` or by editing their Transform, and carry/push
+ * dynamic ones; their velocities are not read back.
  */
 export const RigidBody = component('RigidBody', () => ({
   type: 'dynamic' as BodyType,

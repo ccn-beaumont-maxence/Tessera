@@ -47,6 +47,7 @@ import {
   type SceneIO,
   type Spec,
   suggest,
+  toSpec,
 } from './parse';
 
 type AnyComponent = ComponentType<unknown>;
@@ -99,6 +100,13 @@ const SceneState = resource(
   { internal: true },
 );
 
+const BUILTIN_SYSTEMS: Record<string, System> = {
+  SpriteAnimate,
+  Animate,
+  Timers,
+  Particles: ParticleSystem,
+};
+
 const isSystem = (v: unknown): v is System =>
   typeof v === 'object' && v !== null && 'run' in v && 'name' in v && 'reads' in v;
 
@@ -106,7 +114,7 @@ async function registry(parsed: Parsed, io: SceneIO): Promise<Registry> {
   const r: Registry = {
     components: { ...BUILTIN_COMPONENTS },
     resources: {},
-    systems: { SpriteAnimate, Animate, Timers, Particles: ParticleSystem },
+    systems: { ...BUILTIN_SYSTEMS },
   };
   for (const [i, script] of parsed.scripts.entries()) {
     let mod: Record<string, unknown>;
@@ -129,13 +137,23 @@ async function registry(parsed: Parsed, io: SceneIO): Promise<Registry> {
   return r;
 }
 
-const ASSET = /\.(png|jpe?g|webp|gif|svg|gltf|glb|mp3|ogg|wav|m4a)$/i;
+const ALIGN = ['left', 'center', 'right'];
+// ponytail: engine enums listed here; give component() an options map once script components need enums.
+const ENUMS: Record<string, string[]> = {
+  'Mesh.shape': ['box', 'sphere', 'plane', 'capsule', 'cylinder', 'cone', 'ico'],
+  'Light.kind': ['directional', 'point', 'ambient'],
+  'Sprite.align': ALIGN,
+  'Text.align': ALIGN,
+  'RigidBody.type': ['dynamic', 'fixed', 'kinematic'],
+  'Collider.shape': ['box', 'sphere', 'capsule'],
+};
 
 /**
  * Converts a YAML value onto a default: [x, y(, z)] for vectors, [rx, ry, rz] Euler radians
- * or [x, y, z, w] for quaternions, '#rrggbb' or [r, g, b(, a)] for colors, relative asset paths.
+ * or [x, y, z, w] for quaternions, '#rrggbb' or [r, g, b(, a)] for colors (asset paths are
+ * already URLs: see toSpec).
  */
-function convert(def: unknown, val: unknown, loc: Loc, label: string, io: SceneIO): unknown {
+function convert(def: unknown, val: unknown, loc: Loc, label: string): unknown {
   if (val === undefined || val === null) return def;
   const expect = (what: string): never =>
     loc.fail(`${label} expects ${what}, got ${JSON.stringify(val)}`);
@@ -143,9 +161,12 @@ function convert(def: unknown, val: unknown, loc: Loc, label: string, io: SceneI
   if (typeof def === 'boolean') return typeof val === 'boolean' ? val : expect('true or false');
   if (typeof def === 'string') {
     if (typeof val !== 'string') return expect('a string');
-    return ASSET.test(val) && !/^([a-z]+:|\/)/i.test(val)
-      ? io.url(join(dirOf(loc.file), val))
-      : val;
+    const options = ENUMS[label];
+    if (options && !options.includes(val)) {
+      const hint = suggest(val, options) || (val === 'circle' ? ' (sphere is a circle in 2D)' : '');
+      return loc.fail(`${label} must be ${options.join(', ')}, got "${val}"${hint}`);
+    }
+    return val;
   }
   if (Array.isArray(def)) return Array.isArray(val) ? [...val] : expect('a list');
   if (typeof def !== 'object' || def === null) return val;
@@ -180,7 +201,7 @@ function convert(def: unknown, val: unknown, loc: Loc, label: string, io: SceneI
   for (const [k, v] of Object.entries(val)) {
     if (!(k in o))
       loc.fail(`unknown field "${k}" in ${label}${suggest(k, keys)} (fields: ${keys.join(', ')})`);
-    o[k] = convert(o[k], v, loc, `${label}.${k}`, io);
+    o[k] = convert(o[k], v, loc, `${label}.${k}`);
   }
   return o;
 }
@@ -195,11 +216,11 @@ function componentType(r: Registry, name: string, loc: Loc): AnyComponent {
   return t;
 }
 
-function addSpec(world: World, e: Entity, spec: Spec, r: Registry, loc: Loc, io: SceneIO): void {
+function addSpec(world: World, e: Entity, spec: Spec, r: Registry, loc: Loc): void {
   for (const [name, fields] of Object.entries(spec)) {
     const l = loc.at(name);
     const type = componentType(r, name, l);
-    const value = convert(type.create(), fields, l, name, io);
+    const value = convert(type.create(), fields, l, name);
     world.add(e, type, value as Partial<unknown>);
   }
 }
@@ -212,6 +233,13 @@ const usesAny = (p: Parsed, names: string[]) =>
 /** Loads scripts and physics, and checks names, so that instantiate() cannot need I/O. */
 async function prepare(parsed: Parsed, io: SceneIO): Promise<Prepared> {
   const r = await registry(parsed, io);
+  check(parsed, r);
+  if (usesPhysics(parsed)) await loadPhysics(parsed.dimension);
+  return { parsed, registry: r };
+}
+
+/** Load-time checks of names and prefab fields, with file:line errors. */
+function check(parsed: Parsed, r: Registry): void {
   for (const [i, name] of parsed.systems.entries()) {
     if (!r.systems[name] && !['Input', 'Physics'].includes(name))
       parsed.loc
@@ -224,10 +252,32 @@ async function prepare(parsed: Parsed, io: SceneIO): Promise<Prepared> {
         .at('resources', name)
         .fail(`unknown resource "${name}"${suggest(name, Object.keys(r.resources))}`);
   }
-  for (const def of parsed.entities)
+  const wrong = parsed.dimension === '2d' ? 'Camera3D' : 'Camera2D';
+  for (const { spec, loc } of [...parsed.entities, ...Object.values(parsed.prefabs)]) {
+    if (wrong in spec)
+      loc
+        .at(wrong)
+        .fail(
+          `${wrong} does nothing in a dimension: ${parsed.dimension} scene (use Camera${parsed.dimension.toUpperCase()})`,
+        );
+  }
+  for (const def of parsed.entities) {
     for (const name of Object.keys(def.spec)) componentType(r, name, def.loc.at(name));
-  if (usesPhysics(parsed)) await loadPhysics(parsed.dimension);
-  return { parsed, registry: r };
+    const body = ['RigidBody', 'Collider'].find((n) => n in def.spec);
+    if (def.parent !== null && body)
+      def.loc
+        .at(body)
+        .fail(
+          `${body} on a child entity: physics bodies must be root entities (move it out of children:, or put it on the parent)`,
+        );
+  }
+  // Prefabs are often spawned only from code: check their fields now, not on the first spawn.
+  for (const p of Object.values(parsed.prefabs)) {
+    for (const [name, fields] of Object.entries(p.spec)) {
+      const l = p.loc.at(name);
+      convert(componentType(r, name, l).create(), fields, l, name);
+    }
+  }
 }
 
 const usesPhysics = (p: Parsed) =>
@@ -252,6 +302,18 @@ export async function build(world: World, parsed: Parsed, io: SceneIO): Promise<
     state.scenes.set(path, await prepare(p, io));
     todo.push(...p.scenes);
   }
+  // A script system no scene lists never runs: a silent no-op otherwise.
+  const listed = new Set([...state.scenes.values()].flatMap((s) => s.parsed.systems));
+  for (const { parsed: p, registry: r } of state.scenes.values()) {
+    for (const name of Object.keys(r.systems)) {
+      if (!(name in BUILTIN_SYSTEMS) && !listed.has(name))
+        p.loc
+          .at('systems')
+          .fail(
+            `system "${name}" from scripts never runs: add it to systems: (they run in that order)`,
+          );
+    }
+  }
   instantiate(world, state.scenes.get(parsed.path) as Prepared);
 }
 
@@ -273,7 +335,6 @@ function pickLang(available: string[]): string {
 
 function instantiate(world: World, { parsed, registry: r }: Prepared): void {
   const state = world.resource(SceneState);
-  const io = state.io as SceneIO;
   Object.assign(state, { parsed, registry: r });
   state.entities.clear();
   const strings = world.resource(Strings);
@@ -282,7 +343,7 @@ function instantiate(world: World, { parsed, registry: r }: Prepared): void {
 
   for (const [name, fields] of Object.entries(parsed.resources)) {
     const type = r.resources[name] as ResourceType<unknown>;
-    convert(world.resource(type), fields, parsed.loc.at('resources', name), name, io);
+    convert(world.resource(type), fields, parsed.loc.at('resources', name), name);
   }
 
   const order = [...parsed.systems];
@@ -310,7 +371,7 @@ function instantiate(world: World, { parsed, registry: r }: Prepared): void {
 
   for (const def of parsed.entities) {
     const e = world.spawn(def.name);
-    addSpec(world, e, def.spec, r, def.loc, io);
+    addSpec(world, e, def.spec, r, def.loc);
     state.entities.set(def.key, { entity: e, spec: def.spec });
     link(world, e, def);
   }
@@ -380,6 +441,9 @@ export function loadScene(
   state.next = { path: full, keep };
 }
 
+/** Every scene loadScene() may switch to (the current one included). */
+export const scenePaths = (world: World): string[] => [...world.resource(SceneState).scenes.keys()];
+
 /** Path of the scene currently instantiated in `world`, or null. */
 export const currentScene = (world: World): string | null =>
   world.resource(SceneState).parsed?.path ?? null;
@@ -402,11 +466,20 @@ export function reload(world: World, next: Parsed): boolean {
   const state = world.resource(SceneState);
   const prev = state.parsed;
   const r = state.registry;
-  const io = state.io;
-  if (!prev || !r || !io) throw new Error('scene: reload() needs a world built by build()');
-  if (prev?.path !== next.path) return false;
+  if (!prev || !r) throw new Error('scene: reload() needs a world built by build()');
+  const cached = state.scenes.get(next.path);
+  if (!cached) return false;
   for (const k of ['dimension', 'scripts', 'systems', 'input', 'physics', 'scenes'] as const) {
-    if (!same(prev[k], next[k])) return false;
+    if (!same(cached.parsed[k], next[k])) return false;
+  }
+  // Rapier is loaded (async) at build only when some scene used it.
+  if (usesPhysics(next) && ![...state.scenes.values()].some((s) => usesPhysics(s.parsed)))
+    return false;
+  if (prev.path !== next.path) {
+    // Another scene of the game: loadScene() instantiates the edited version.
+    check(next, cached.registry);
+    cached.parsed = next;
+    return true;
   }
 
   world.resource(Strings).tables = next.strings;
@@ -415,7 +488,7 @@ export function reload(world: World, next: Parsed): boolean {
     const old = prev.resources[name] ?? {};
     if (!type) return next.loc.at('resources', name).fail(`unknown resource "${name}"`);
     const changed = Object.fromEntries(Object.entries(fields).filter(([k, v]) => !same(old[k], v)));
-    convert(world.resource(type), changed, next.loc.at('resources', name), name, io);
+    convert(world.resource(type), changed, next.loc.at('resources', name), name);
   }
 
   const seen = new Set<string>();
@@ -424,7 +497,7 @@ export function reload(world: World, next: Parsed): boolean {
     const cur = state.entities.get(def.key);
     if (!cur || !world.alive(cur.entity)) {
       const e = world.spawn(def.name);
-      addSpec(world, e, def.spec, r, def.loc, io);
+      addSpec(world, e, def.spec, r, def.loc);
       state.entities.set(def.key, { entity: e, spec: def.spec });
       link(world, e, def);
       continue;
@@ -436,7 +509,7 @@ export function reload(world: World, next: Parsed): boolean {
       const live = world.get(e, type) as Record<string, unknown> | undefined;
       const old = cur.spec[name];
       if (!live || !old) {
-        addSpec(world, e, { [name]: fields }, r, def.loc, io);
+        addSpec(world, e, { [name]: fields }, r, def.loc);
         continue;
       }
       const defaults = type.create() as Record<string, unknown>;
@@ -444,7 +517,7 @@ export function reload(world: World, next: Parsed): boolean {
         if (same(old[k], fields[k])) continue;
         if (!(k in defaults))
           l.fail(`unknown field "${k}" in ${name}${suggest(k, Object.keys(defaults))}`);
-        live[k] = convert(defaults[k], fields[k], l, `${name}.${k}`, io);
+        live[k] = convert(defaults[k], fields[k], l, `${name}.${k}`);
       }
     }
     for (const name of Object.keys(cur.spec)) {
@@ -459,6 +532,7 @@ export function reload(world: World, next: Parsed): boolean {
     }
   }
   state.parsed = next;
+  cached.parsed = next;
   return true;
 }
 
@@ -474,10 +548,11 @@ export function spawnPrefab(world: World, name: string, overrides: Spec = {}): E
     );
   }
   const e = world.spawn(name);
+  const over = toSpec(overrides, p.loc, io);
   const spec: Spec = {};
-  for (const [k, v] of Object.entries(p.spec)) spec[k] = { ...v, ...overrides[k] };
-  for (const [k, v] of Object.entries(overrides)) spec[k] ??= v;
-  addSpec(world, e, spec, r, p.loc, io);
+  for (const [k, v] of Object.entries(p.spec)) spec[k] = { ...v, ...over[k] };
+  for (const [k, v] of Object.entries(over)) spec[k] ??= v;
+  addSpec(world, e, spec, r, p.loc);
   return e;
 }
 

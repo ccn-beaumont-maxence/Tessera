@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { World } from '@tessera/core';
 import { sceneGame } from '@tessera/scene';
@@ -13,6 +13,7 @@ export async function loadExample(
     read: async (p) => readFileSync(p, 'utf8').replace(/\.\/game\.(ts|tess)\b/, `./${script}`),
     load: (p) => import(/* @vite-ignore */ p),
     url: (p) => relative(process.cwd(), p),
+    exists: existsSync,
   });
   const w = new World({ seed });
   await game.setup(w);

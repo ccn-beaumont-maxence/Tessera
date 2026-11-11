@@ -1,5 +1,6 @@
 import type { Decl, Expr, Field, Param, Stmt, TypeRef } from './ast';
-import { lex, type Pos, TessError, type Token } from './lexer';
+import { table } from './engine';
+import { lex, type Pos, suggest, TessError, type Token } from './lexer';
 
 const VALUE_TYPES = [
   'float',
@@ -16,7 +17,8 @@ const VALUE_TYPES = [
 ];
 
 /** C++ habits mapped to their Tess equivalent (spec: "Not in Tess"). */
-const CPP: Record<string, string> = {
+const BITWISE = 'Tess has no bitwise operators: use && and || on bools, * 2 and / 2 on ints';
+const CPP: Record<string, string> = table({
   '#': 'Tess has no #include or preprocessor: use `using "./other.tess";`',
   '->': 'Tess has no pointers: use `.` (a.b)',
   '::': 'Tess has no `::`: use `.`',
@@ -34,7 +36,16 @@ const CPP: Record<string, string> = {
   unsigned: 'Tess has no unsigned: use int',
   double: 'Tess has no double: use float',
   long: 'Tess has no long: use int',
-};
+  switch: 'Tess has no switch: use if / else if',
+  do: 'Tess has no do-while: use while (cond) { ... }',
+  enum: 'Tess has no enum: use constants, const int IDLE = 0;',
+  toString: 'Tess has no toString: concatenate, "" + x',
+  to_string: 'Tess has no to_string: concatenate, "" + x',
+  '&': BITWISE,
+  '|': BITWISE,
+  '^': BITWISE,
+  '~': BITWISE,
+});
 
 export function parse(src: string, file: string): Decl[] {
   return new Parser(lex(src, file), file).program();
@@ -84,6 +95,10 @@ class Parser {
     const t = this.tok;
     if (t.kind === 'string' || t.kind === 'number') return;
     if (t.text === 'std' && this.is('::', this.peek())) this.fail(CPP.std as string);
+    const prev = this.toks[this.i - 1];
+    // `<<` and `>>` lex as two tokens; the second one lands here.
+    if ((t.text === '<' || t.text === '>') && prev?.text === t.text && prev.col + 1 === t.col)
+      this.fail(BITWISE);
     const msg = CPP[t.text];
     if (msg && t.text !== 'std') this.fail(msg);
   }
@@ -217,8 +232,18 @@ class Parser {
     if (this.eat('continue')) return this.end({ kind: 'continue', ...at });
     if (this.eat('return'))
       return this.end({ kind: 'return', value: this.is(';') ? null : this.expr(), ...at });
+    if (this.eat('const')) {
+      const v = this.varDecl();
+      if (!v.init) this.fail(`\`const\` needs a value: const ${v.type?.name} ${v.name} = 0;`, v);
+      return this.end({ ...v, const: true });
+    }
     if (this.isDecl()) return this.end(this.varDecl());
-    return this.end({ kind: 'expr', expr: this.expr(), ...at });
+    const expr = this.expr();
+    if (expr.kind === 'ident' && !this.is(';')) {
+      const hint = suggest(expr.name, ['return', 'break', 'continue', 'const']);
+      if (hint) this.fail(`unknown statement "${expr.name}"${hint}`, expr);
+    }
+    return this.end({ kind: 'expr', expr, ...at });
   }
 
   private end<T extends Stmt>(s: T): T {
@@ -226,7 +251,7 @@ class Parser {
     return s;
   }
 
-  private varDecl(): Stmt {
+  private varDecl(): Extract<Stmt, { kind: 'var' }> {
     const type = this.type();
     const name = this.ident('a variable name').text;
     const init = this.eat('=') ? this.expr() : null;
@@ -236,6 +261,7 @@ class Parser {
       type: type.name === 'auto' ? null : type,
       name,
       init,
+      const: false,
       line: type.line,
       col: type.col,
     };
